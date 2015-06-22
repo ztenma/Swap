@@ -27,7 +27,7 @@ BG_LCOLORS = ['\033[40m', '\033[101m', '\033[103m', '\033[104m', '\033[102m', '\
 BG_DCOLORS = ['\033[40m', '\033[41m', '\033[43m', '\033[44m', '\033[42m', '\033[45m', '\033[46m']
 fgcolors = lambda i: FG_DCOLORS[i] if i < 7 else '\033[97m'
 bgcolors = lambda i: BG_DCOLORS[i] if i < 7 else '\033[97m'
-SCORES = [10, 100, 500, 2000, 5000, 10000, 20000, 50000]
+SCORES = [10, 100, 500, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000]
 scoreIt = lambda x: SCORES[x-3] if x <= 10 else 0#10 ** ((x-2)
 
 class Grid(object):
@@ -60,66 +60,60 @@ class Grid(object):
 		return self.displayBlocks()
 		#return '\n'.join(' '.join(map(str, (self._grid[i][j] for i in range(self.width)))) for j in range(self.height)) + '\n'
 
-	# Return a string represeting grid, with digits and colors
 	def displayDigits(self):
+		"""Return a string represeting grid, with digits and colors"""
 		return (RESET_COLOR + '\n').join(' '.join(fgcolors(self._grid[i][j]) + \
 		str(self._grid[i][j]) for i in range(self.width)) + ' '\
 		for j in range(self.height)) + (RESET_COLOR + '\n')
 
-	# Return a string represeting grid, with colors blocks
 	def displayBlocks(self):
+		"""Return a string represeting grid, with colors blocks"""
 		return (RESET_COLOR + '\n').join(''.join(bgcolors(self._grid[i][j]) + '  '\
 		for i in range(self.width)) for j in range(self.height)) + (RESET_COLOR + '\n')
 
-	# Generate a valid grid
 	def generate(self):
+		"""Generate a valid grid"""
 		for x in range(self.width):
 			for y in reversed(range(randrange(self.height) + 1, self.height)):
 				self._grid[x][y] = self.genBlock(x, y)
 
-	# Generate a random block based on neighbour blocks
 	def genBlock(self, x:int, y:int):
+		"""Generate a random block based on neighbour blocks"""
 		rand = randrange(1, self.nbSymbols)
 		while (y <= self.height - 3 and self[x][y+1] == self[x][y+2] == rand) \
 		or (x >= 2 and self[x-1][y] == self[x-2][y] == rand):
 			rand = randrange(1, self.nbSymbols)
 		return rand
 
-	# Swap two blocks horizontally
 	def swap(self, x:int, y:int):
+		"""Swap two blocks horizontally"""
 		self[x][y], self[x+1][y] = self[x+1][y], self[x][y]
 
-	# Make blocks fall instantly
 	def fallInstant(self, focusX=None):
+		"""Make blocks fall instantly"""
 		for x in ((focusX, focusX+1) if focusX != None else range(self.width)):
 			for y in reversed(range(self.height)):
-				if self[x][y] == 0:
-					#print('zéro: ({},{})'.format(x, y), 'col:', [self[x][j] for j in range(self.height)])
-					while self[x][y] == 0 and not all(self[x][j] == 0 for j in range(y)):
-						for j in reversed(range(y)):
-							self[x][j+1] = self[x][j]
-							#print('move:', self[x][j2])
-						self[x][j] = 0#genBlock(x, y)
-					#print('->', [self[x][j] for j in range(self.height)])
+				while self[x][y] == 0 and any(self[x][j] != 0 for j in range(y)):
+					for j in reversed(range(y)):
+						self[x][j+1] = self[x][j]
+					self[x][j] = 0
 
-	# Make blocks fall one step, return whether it was the last step of fall
 	def fallStep(self, focusX=None):
+		"""Make blocks fall one step, return whether it was the last step of fall"""
 		isLastStep = True
 		for x in ((focusX, focusX+1) if focusX != None else range(self.width)):
 			for y in reversed(range(self.height)):
 				if self[x][y] == 0 and any(self[x][j] != 0 for j in range(y)):
-					#print('zéro: ({},{})'.format(x, y), 'col:', [self[x][j] for j in range(self.height)])
 					for j in reversed(range(y)):
 						self[x][j+1] = self[x][j]
-						#print('move:', self[x][j2])
 					self[x][j] = 0
 					if any(self[x][j] != 0 for j in range(y)):
 						isLastStep = False
 					break
-				#print('->', [self[x][j] for j in range(self.height)])
 		return isLastStep
 
 	def __testComboLine(self, y):
+		"""Look for combos in line and return them"""
 		combos = []
 		comboCount = 1
 
@@ -139,6 +133,7 @@ class Grid(object):
 		return combos
 
 	def __testComboColumn(self, x):
+		"""Look for combos in column and return them"""
 		combos = []
 		comboCount = 1
 
@@ -157,9 +152,9 @@ class Grid(object):
 				combos.append([(x, j) for j in range(y-comboCount+1, y+1)])
 		return combos
 
-	# Test existance of combos at the designated swap position
-	# Return set of positions of blocks combinated
 	def testComboSwap(self, x, y):
+		"""Test existance of combos at the designated swap position
+Return set of positions of blocks combinated"""
 		combos = []
 
 		combos.extend(self.__testComboLine(y))
@@ -168,10 +163,9 @@ class Grid(object):
 
 		return combos
 
-	# Test existance of combos in the whole grid
-	# Return set of positions of blocks combinated
 	def testComboAll(self):
-		comboCount = 1
+		"""Test existance of combos in the whole grid
+Return set of positions of blocks combinated"""
 		combos = []
 
 		for x in range(self.width):
@@ -214,20 +208,17 @@ def test1():
 	print('fallInstant\n' + str(grid))
 
 def test2():
-	_grid = [[randrange(4) for _ in range(20)] for _ in range(40)]
-	grid = Grid(data=_grid, nbSymbols=3)
-	#grid = Grid(40, 20, 6)
+	grid = Grid(data=[[randrange(4) for _ in range(20)] for _ in range(40)], nbSymbols=4)
+	#grid = Grid(40, 20, 4)
 	print('init\n' + str(grid))
-	input()
 
-	score = 0
+	score, scoreMultiplier = 0, 1
 	combos = True
 	while combos:
-		lastStep = grid.fallStep()
+		lastStep = grid.fall(step=True)
 		print('fallStep', lastStep, '\n' + str(grid))
-		print(score)
-		#input()
-		time.sleep(.5)
+		print('score:', score)
+		time.sleep(.2)
 		if not lastStep: continue
 
 		combos = grid.testComboAll()
@@ -235,13 +226,41 @@ def test2():
 		#print(combos, combosPos)
 		if combos:
 			for combo in combos:
-				score += scoreIt(len(combo))
+				score += scoreIt(len(combo)) * scoreMultiplier
 				#print(len(combo), scoreIt(len(combo)), end=' ')
 			#print()
+			scoreMultiplier += 1
 			for pos in combosPos: # Remove combos
 				grid[pos] = 0
 			print('testComboAll:', combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
-			time.sleep(.5)
+			time.sleep(1)
+
+def test3():
+	_grid = rotateMatrix([
+[1,1,0,1,2,0,3,2,1,1,0,1,3,0,1,0,1,3,2,3,2,0,1,0,1,1,0,1,3,0,0,0,0,0,0,0,3,1,0,3],
+[0,0,1,1,0,3,1,3,0,0,0,2,0,3,3,3,2,1,0,0,1,3,2,3,2,0,3,2,1,2,1,1,2,1,3,1,2,3,0,0],
+[3,3,0,3,0,1,2,1,3,3,2,1,2,3,1,1,0,3,0,1,2,0,2,1,0,2,1,1,0,2,0,3,0,1,1,3,1,3,2,2],
+[2,3,0,2,1,3,3,0,1,0,1,0,1,0,3,1,1,0,3,0,0,0,0,1,3,3,3,2,2,2,0,2,1,0,3,3,2,0,1,3],
+[0,1,0,3,0,0,2,0,0,3,0,3,0,0,2,1,0,0,2,0,2,3,3,3,1,0,3,0,1,3,1,2,3,1,2,1,0,2,2,3],
+[3,1,3,1,2,0,2,3,3,1,3,0,3,1,0,3,1,0,3,3,3,2,0,1,2,2,0,1,2,3,0,1,0,2,2,0,2,0,0,0],
+[2,2,3,2,0,0,0,1,3,0,3,1,1,0,2,0,2,1,3,2,3,1,3,2,3,3,3,0,3,1,3,0,3,1,1,1,1,0,2,0],
+[3,3,3,0,0,1,1,2,1,1,2,2,1,0,2,2,0,1,0,0,2,0,2,3,2,3,1,1,0,1,1,3,1,2,0,1,2,2,0,1],
+[1,2,1,3,2,0,2,0,1,2,0,0,0,2,3,1,2,2,1,3,2,0,1,3,2,2,2,1,0,1,3,1,0,3,1,1,3,2,2,0],
+[0,2,2,2,1,1,0,2,1,1,1,3,2,3,1,2,3,0,3,1,0,1,3,3,1,2,1,2,0,0,3,2,3,0,0,2,2,1,1,1],
+[0,3,2,3,0,0,2,3,0,1,1,0,3,0,0,1,1,3,1,0,1,2,0,1,2,2,2,3,3,1,3,2,3,3,2,0,1,2,0,2],
+[2,1,0,3,1,0,3,0,0,1,3,1,0,1,0,2,0,0,1,2,2,2,2,3,2,3,1,1,2,3,0,2,2,0,3,2,0,0,2,2],
+[3,0,3,1,0,3,2,0,3,1,2,2,3,3,2,1,2,2,3,2,0,3,2,2,3,1,2,2,0,2,3,2,1,2,0,0,0,1,3,0],
+[1,2,0,0,0,0,1,2,1,0,3,3,1,0,2,1,1,2,1,2,0,3,1,2,3,1,3,2,3,0,3,0,0,2,2,3,1,2,3,2],
+[1,0,1,0,2,2,0,0,1,1,0,3,3,3,2,2,3,0,1,2,0,0,3,0,2,0,1,3,1,2,3,3,0,3,0,0,1,2,1,2],
+[0,0,2,1,3,1,2,3,0,2,1,0,3,1,0,3,3,2,0,0,1,2,3,0,3,2,3,3,1,1,1,0,2,1,2,1,0,2,1,3],
+[3,3,3,0,0,1,0,2,0,2,1,3,1,1,3,3,1,0,2,0,3,2,3,0,1,2,0,0,0,1,0,0,2,3,3,2,1,1,0,2],
+[1,0,3,1,1,0,1,0,2,3,1,2,3,1,1,2,2,2,1,3,3,1,1,3,1,1,0,2,3,3,3,3,0,1,3,0,1,1,3,0],
+[2,1,3,1,2,1,2,1,3,0,3,2,3,1,2,2,0,1,1,1,1,1,1,2,1,3,1,2,3,3,2,0,2,3,2,2,0,3,3,1],
+[1,2,3,1,2,1,1,3,0,0,1,0,1,0,1,1,2,1,2,0,0,1,2,2,0,1,1,3,2,3,1,3,2,1,3,2,1,3,2,3]
+])
+	grid = Grid(data=_grid, nbSymbols=4)
+	print('init\n' + str(grid))
+	return grid
 
 if __name__ == '__main__':
 	#print("\033[104mkuro\033[00mmatsu")
