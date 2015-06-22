@@ -27,8 +27,8 @@ BG_LCOLORS = ['\033[40m', '\033[101m', '\033[103m', '\033[104m', '\033[102m', '\
 BG_DCOLORS = ['\033[40m', '\033[41m', '\033[43m', '\033[44m', '\033[42m', '\033[45m', '\033[46m']
 fgcolors = lambda i: FG_DCOLORS[i] if i < 7 else '\033[97m'
 bgcolors = lambda i: BG_DCOLORS[i] if i < 7 else '\033[97m'
-SCORES = [10, 100, 500, 2000, 5000, 10000, 15000, 20000]
-scoreIt = lambda x: SCORES[x-3] #10 ** ((x-2)
+SCORES = [10, 100, 500, 2000, 5000, 10000, 20000, 50000]
+scoreIt = lambda x: SCORES[x-3] if x <= 10 else 0#10 ** ((x-2)
 
 class Grid(object):
 
@@ -119,41 +119,54 @@ class Grid(object):
 				#print('->', [self[x][j] for j in range(self.height)])
 		return isLastStep
 
+	def __testComboLine(self, y):
+		combos = []
+		comboCount = 1
+
+		#print('line:', [self[i][y] for i in range(self.width)])
+		# Iterate through line
+		for x in range(self.width):
+			ref = self[x][y]
+			#print('({},{}) ref {} xcombo {}'.format(x, y, ref, comboCount))
+			if ref != 0 and x >= 1 and ref == self[x-1][y]:
+				comboCount += 1
+			if self[x-1][y] != ref:
+				if comboCount >= 3:
+					combos.append([(i, y) for i in range(x-comboCount, x)])
+				comboCount = 1
+			if x == self.width - 1 and comboCount >= 3:
+				combos.append([(i, y) for i in range(x-comboCount+1, x+1)])
+		return combos
+
+	def __testComboColumn(self, x):
+		combos = []
+		comboCount = 1
+
+		#print('column:', [self[x][j] for j in range(self.height)])
+		# Iterate through column
+		for y in range(self.height):
+			ref = self[x][y]
+			#print('({},{}) ref {} ycombo {}'.format(x, y, ref, comboCount))
+			if ref != 0 and y >= 1 and ref == self[x][y-1]:
+				comboCount += 1
+			if ref != self[x][y-1]:
+				if comboCount >= 3:
+					combos.append([(x, j) for j in range(y-comboCount, y)])
+				comboCount = 1
+			if y == self.height - 1 and comboCount >= 3:
+				combos.append([(x, j) for j in range(y-comboCount+1, y+1)])
+		return combos
+
 	# Test existance of combos at the designated swap position
 	# Return set of positions of blocks combinated
-	"""def testCombo(self, x, y): # TODO
-		ref = self[x][y]
-		if ref == 0: continue
-		print('ref:', ref)
+	def testComboSwap(self, x, y):
+		combos = []
 
-		comboPos = set()
-		comboCount = 1
-		# Iterate through line
-		print('line:', [self[i][y] for i in range(self.width)])
-		for i in range(self.width):
-			print('({0},{1}): {2} c{3}'.format(i, y, self[i][y], comboCount), end='\n')
-			if self[i][y] == ref:
-				comboCount += 1
-			if i == self.width - 1 or self[i+1][y] != ref:
-				if comboCount >= 3:
-					print('blocks:', [(k, y) for k in range(i+1-comboCount, i+1)])
-					comboPos.update([(k, y) for k in range(i+1-comboCount, i+1)])
-				break
+		combos.extend(self.__testComboLine(y))
+		combos.extend(self.__testComboColumn(x))
+		combos.extend(self.__testComboColumn(x+1))
 
-		comboCount = 1
-		# Iterate through column
-		print('column:', self[x][:])
-		for j in range(self.height):
-			print('({0},{1}): {2} c{3}'.format(x, j, self[x][j], comboCount), end='\n')
-			if self[x][j] == ref:
-				comboCount += 1
-			if j == self.height - 1 or self[x][j+1] != ref:
-				if comboCount >= 3:
-					print('blocks:', [(x, k) for k in range(j+1-comboCount, j+1)])
-					comboPos.update([(x, k) for k in range(j+1-comboCount, j+1)])
-				break
-
-		return comboPos"""
+		return combos
 
 	# Test existance of combos in the whole grid
 	# Return set of positions of blocks combinated
@@ -162,47 +175,10 @@ class Grid(object):
 		combos = []
 
 		for x in range(self.width):
-			for y in range(self.height):
-				ref = self[x][y]
-				if ref == 0: continue
-
-				#print('({},{}) ref {} ycombo {}'.format(x, y, ref, comboCount))
-				if y >= 1 and ref == self[x][y-1]:
-					comboCount += 1
-				if ref != self[x][y-1]:
-					if comboCount >= 3:
-						blocks = [(x, j) for j in range(y-comboCount, y)]
-						#print('blocks:', blocks)
-						combos.append(blocks)
-						#print('ycombo:', comboCount)
-					comboCount = 1
-				if y == self.height - 1 and comboCount >= 3:
-					blocks = [(x, j) for j in range(y-comboCount+1, y+1)]
-					#print('blocks:', blocks)
-					combos.append(blocks)
-
-			comboCount = 1
+			combos.extend(self.__testComboColumn(x))
 
 		for y in range(self.height):
-			for x in range(self.width):
-				ref = self[x][y]
-				if ref == 0: continue
-
-				#print('({},{}) ref {} xcombo {}'.format(x, y, ref, comboCount))
-				if x >= 1 and ref == self[x-1][y]:
-					comboCount += 1
-				if self[x-1][y] != ref:
-					if comboCount >= 3:
-						blocks = [(i, y) for i in range(x-comboCount, x)]
-						#print('blocks:', blocks)
-						combos.append(blocks)
-						#print('xcombo:', comboCount)
-					comboCount = 1
-				if x == self.width - 1 and comboCount >= 3:
-					blocks = [(i, y) for i in range(x-comboCount+1, x+1)]
-					#print('blocks:', blocks)
-					combos.append(blocks)
-			comboCount = 1
+			combos.extend(self.__testComboLine(y))
 
 		return combos
 
@@ -219,16 +195,26 @@ def test1():
 	[1, 1, 0, 2, 4, 3]])
 	grid = Grid(data=_grid, nbSymbols=5)
 	print('init\n' + str(grid))
+	pos = (2, 1)
 
 	grid.fallInstant()
 	print('fallInstant\n' + str(grid))
-	grid.swap(2, 1)
+	grid.swap(*pos)
 	print('swap 2,1\n' + str(grid))
-	grid.fallInstant(2)
+	grid.fallInstant(pos[0])
+	print('fallInstant\n' + str(grid))
+
+	combos = grid.testComboAll()
+	combosPos = set(itertools.chain.from_iterable(combos))
+	for pos in combosPos: # Remove combos
+		grid[pos] = 0
+	print('testCombo {}:'.format(pos), combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
+
+	grid.fallInstant()
 	print('fallInstant\n' + str(grid))
 
 def test2():
-	_grid = [[randrange(3) for _ in range(20)] for _ in range(40)]
+	_grid = [[randrange(4) for _ in range(20)] for _ in range(40)]
 	grid = Grid(data=_grid, nbSymbols=3)
 	#grid = Grid(40, 20, 6)
 	print('init\n' + str(grid))
@@ -246,15 +232,15 @@ def test2():
 
 		combos = grid.testComboAll()
 		combosPos = set(itertools.chain.from_iterable(combos))
-		print(combos, combosPos)
+		#print(combos, combosPos)
 		if combos:
 			for combo in combos:
 				score += scoreIt(len(combo))
-				print(len(combo), scoreIt(len(combo)), end=' ')
-			print()
+				#print(len(combo), scoreIt(len(combo)), end=' ')
+			#print()
 			for pos in combosPos: # Remove combos
 				grid[pos] = 0
-			print('testCombo1All:', combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
+			print('testComboAll:', combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
 			time.sleep(.5)
 
 if __name__ == '__main__':
