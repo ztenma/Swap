@@ -177,8 +177,7 @@ Return set of positions of blocks combinated"""
 		return combos
 
 def rotateMatrix(mat):
-	w, h = len(mat), len(mat[0])
-	return [[mat[y][x] for y in range(w)] for x in range(h)]
+	return [[mat[y][x] for y in range(len(mat))] for x in range(len(mat[0]))]
 
 
 def test1():
@@ -215,7 +214,7 @@ def test2():
 	score, scoreMultiplier = 0, 1
 	combos = True
 	while combos:
-		lastStep = grid.fall(step=True)
+		lastStep = grid.fallStep()
 		print('fallStep', lastStep, '\n' + str(grid))
 		print('score:', score)
 		time.sleep(.2)
