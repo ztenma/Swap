@@ -57,16 +57,19 @@ class Grid(object):
 		self._grid[pos[0]][pos[1]] = val
 
 	def __repr__(self):
-		return self.displayBlocks()
+		return self.reprBlocks()
 		#return '\n'.join(' '.join(map(str, (self._grid[i][j] for i in range(self.width)))) for j in range(self.height)) + '\n'
 
-	def displayDigits(self):
+	def reprDigits(self, color=True):
 		"""Return a string represeting grid, with digits and colors"""
-		return (RESET_COLOR + '\n').join(' '.join(fgcolors(self._grid[i][j]) + \
-		str(self._grid[i][j]) for i in range(self.width)) + ' '\
-		for j in range(self.height)) + (RESET_COLOR + '\n')
+		if color:
+			return (RESET_COLOR + '\n').join(' '.join(fgcolors(self._grid[i][j]) + \
+			str(self._grid[i][j]) for i in range(self.width)) + ' '\
+			for j in range(self.height)) + (RESET_COLOR + '\n')
+		else: return '\n'.join(' '.join(str(self._grid[i][j])\
+			for i in range(self.width)) + ' ' for j in range(self.height)) + '\n'
 
-	def displayBlocks(self):
+	def reprBlocks(self):
 		"""Return a string represeting grid, with colors blocks"""
 		return (RESET_COLOR + '\n').join(''.join(bgcolors(self._grid[i][j]) + '  '\
 		for i in range(self.width)) for j in range(self.height)) + (RESET_COLOR + '\n')
