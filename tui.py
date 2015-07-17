@@ -12,14 +12,10 @@ class TUI(object):
 	('g', 'dark green'), ('m', 'dark magenta'), ('c', 'dark cyan'), ('z', 'light gray')]
 
 	def __init__(self):
-		self.score = 0
-		self.scoreMultiplier = 1
-		self.grid = swap.Grid(15, 20, 4)
+		self.game = swap.Game()
 
 		self.buildUI()
-
-		self.leftGrid.set_text(self.buildMarkup(self.grid))
-		self.rightGrid.set_text(self.buildMarkup(self.grid))
+		self.updateUI()
 
 	def buildUI(self):
 		urwid.set_encoding("UTF-8")
@@ -37,7 +33,7 @@ class TUI(object):
 
 		scoreTitle = urwid.AttrMap(urwid.Text('Score', align='center'), 'title')
 		scoreCont = urwid.Filler(scoreTitle, 'top', top=2)
-		scoreLabel = urwid.Text(str(self.score), align='center')
+		scoreLabel = urwid.Text(str(self.game.score), align='center')
 		statsPile = urwid.Pile([scoreCont, urwid.Filler(urwid.AttrMap(scoreLabel, 'stats'), 'top', top=2)])
 
 		columns = urwid.Columns([(32, leftCont), statsPile, (32, rightCont)])
@@ -50,10 +46,14 @@ class TUI(object):
 		self.frame = frame
 		self.mainLoop = urwid.MainLoop(frame, palette, unhandled_input=self.handleInput)
 
+	def updateUI(self):
+		self.leftGrid.set_text(self.buildMarkup(self.game.grid))
+		self.rightGrid.set_text(self.buildMarkup(self.game.grid))
+		self.scoreLabel.set_text(str(self.game.score))
+
 	def handleInput(self, key):
 		if key == '+':
-			TUI.i += 1
-			self.scoreLabel.base_widget.set_text(str(self.score))
+			self.scoreLabel.base_widget.set_text("plus")
 
 		elif key in ('q', 'Q'):
 			raise urwid.ExitMainLoop()
@@ -63,38 +63,19 @@ class TUI(object):
 		self.mainLoop.run()
 
 	def step(self, loop, user_data):
-		self.updateGame()
-
-		self.scoreLabel.set_text(str(self.score))
-		self.leftGrid.set_text(self.buildMarkup(self.grid))
+		try:
+			self.game.update()
+			self.updateUI()
+		except Exception as e:
+			print(e)
+			raise ExitMainLoop from e
+		self.mainLoop.set_alarm_in(.05, self.step)
 
 	def buildMarkup(self, grid):
 		out = [[(TUI.COLORS[grid[i][j]][0], '  ')\
 		for i in range(grid.width)] + ['\n'] for j in range(grid.height)]
 		#print(out)
 		return out
-
-	def updateGame(self):
-
-		lastStep = self.grid.fallStep()
-		if not lastStep:
-			self.alarm = self.mainLoop.set_alarm_in(.2, self.step)
-			return
-
-		randPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
-		self.grid.swap(*randPos)
-
-		combos = self.grid.testComboAll()
-		combosPos = set(itertools.chain.from_iterable(combos))
-		if combos:
-			for combo in combos:
-				self.score += swap.scoreIt(len(combo)) * self.scoreMultiplier
-			self.scoreMultiplier += 1
-			for pos in combosPos: # Remove combos
-				self.grid[pos] = 0
-			self.alarm = self.mainLoop.set_alarm_in(1, self.step)
-		else:
-			self.alarm = self.mainLoop.set_alarm_in(.2, self.step)
 
 if __name__ == '__main__':
 	TUI().run()

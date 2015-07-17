@@ -21,6 +21,14 @@ from random import randrange
 import time
 import itertools
 
+import logging
+logging.basicConfig(filename='swap.log', filemode='w', level=logging.DEBUG, \
+format='%(asctime)s %(message)s')
+LOG = logging.getLogger(__name__)
+LOG.addHandler(logging.NullHandler())
+
+LOG.info("Starting Swap")
+
 RESET_COLOR = '\033[0m'
 FG_DCOLORS = ['\033[90m', '\033[91m', '\033[93m', '\033[94m', '\033[92m', '\033[95m', '\033[96m']
 BG_LCOLORS = ['\033[40m', '\033[101m', '\033[103m', '\033[104m', '\033[102m', '\033[105m', '\033[106m']
@@ -29,6 +37,71 @@ fgcolors = lambda i: FG_DCOLORS[i] if i < 7 else '\033[97m'
 bgcolors = lambda i: BG_DCOLORS[i] if i < 7 else '\033[97m'
 SCORES = [10, 100, 500, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000]
 scoreIt = lambda x: SCORES[x-3] if x <= 10 else 0#10 ** ((x-2)
+
+class Game(object):
+
+	def __init__(self):
+		self.score = 0
+		self.scoreMultiplier = 1
+
+		self.grid = Grid(15, 20, 4)
+
+		self.state = "init"
+		self.stateData = None
+		self.stateRemainingTime = None
+		self.lastTime = time.time()
+
+	def setState(self, state, stateRemainingTime=None, stateData=None):
+		self.state = state
+		self.stateRemainingTime = stateRemainingTime
+		self.stateData = stateData
+
+	def isStateEnding(self):
+		return self.stateRemainingTime is not None and self.stateRemainingTime <= 0
+
+	def update(self):
+		currentTime = time.time()
+		if self.stateRemainingTime is not None:
+			self.stateRemainingTime -= currentTime - self.lastTime
+		self.lastTime = currentTime
+		LOG.info("%s %s", self.state, self.stateRemainingTime)
+
+		if self.state == "falling":
+			if self.isStateEnding():
+				isLastStep = self.grid.fallStep()
+				if not isLastStep:
+					self.setState("falling", .1)
+				else:
+					self.scoreMultiplier = 1
+					combos = self.grid.testComboAll()
+					if combos:
+						self.setState("combo", 1., combos)
+					else:
+						self.setState("running", .5)
+
+		elif self.state == "combo":
+			if self.isStateEnding():
+				self.processCombo(self.stateData)
+				self.setState("falling", .1)
+
+		elif self.state == "running":
+			if self.isStateEnding():
+				randPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
+				self.grid.swap(*randPos)
+
+				self.setState("falling", .1)
+
+		elif self.state == "init":
+			self.setState("running", 1.)
+
+	def processCombo(self, combos):
+		combosPos = set(itertools.chain.from_iterable(combos))
+		for combo in combos:
+			self.score += scoreIt(len(combo)) * self.scoreMultiplier
+		self.scoreMultiplier += 1
+		for pos in combosPos: # Remove combos
+			self.grid[pos] = 0
+
 
 class Grid(object):
 
@@ -115,7 +188,7 @@ class Grid(object):
 					break
 		return isLastStep
 
-	def __testComboLine(self, y):
+	def testComboLine(self, y):
 		"""Look for combos in line and return them"""
 		combos = []
 		comboCount = 1
@@ -135,7 +208,7 @@ class Grid(object):
 				combos.append([(i, y) for i in range(x-comboCount+1, x+1)])
 		return combos
 
-	def __testComboColumn(self, x):
+	def testComboColumn(self, x):
 		"""Look for combos in column and return them"""
 		combos = []
 		comboCount = 1
@@ -160,9 +233,9 @@ class Grid(object):
 Return set of positions of blocks combinated"""
 		combos = []
 
-		combos.extend(self.__testComboLine(y))
-		combos.extend(self.__testComboColumn(x))
-		combos.extend(self.__testComboColumn(x+1))
+		combos.extend(self.testComboLine(y))
+		combos.extend(self.testComboColumn(x))
+		combos.extend(self.testComboColumn(x+1))
 
 		return combos
 
@@ -172,10 +245,10 @@ Return set of positions of blocks combinated"""
 		combos = []
 
 		for x in range(self.width):
-			combos.extend(self.__testComboColumn(x))
+			combos.extend(self.testComboColumn(x))
 
 		for y in range(self.height):
-			combos.extend(self.__testComboLine(y))
+			combos.extend(self.testComboLine(y))
 
 		return combos
 
