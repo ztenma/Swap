@@ -73,12 +73,13 @@ class TUI(object):
 		for y in range(grid.height):
 			for x in range(grid.width):
 				color, chars = TUI.COLORS[grid[x][y]][0], '  '
-				if self.game.state.name == "running" and self.game.state.status != "starting":
-					spx, spy = self.game.swapperPos
-					if spy == y and spx == x:
-						chars = '>-'
-					elif spy == y and spx+1 == x:
-						chars = '-<'
+
+				spx, spy = self.game.swapperPos
+				if spy == y and spx == x:
+					chars = '>>'
+				elif spy == y and spx+1 == x:
+					chars = '<<'
+
 				out.append((color, chars))
 			out.append('\n')
 		#out = [[(TUI.COLORS[grid[i][j]][0], '  ')\
