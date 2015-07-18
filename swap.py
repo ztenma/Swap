@@ -41,58 +41,47 @@ scoreIt = lambda x: SCORES[x-3] if x <= 10 else 0#10 ** ((x-2)
 class Game(object):
 
 	def __init__(self):
+		self.swapperPos = (0, 0)
+
 		self.score = 0
 		self.scoreMultiplier = 1
 
 		self.grid = Grid(15, 20, 4)
 
-		self.state = "init"
-		self.stateData = None
-		self.stateRemainingTime = None
-		self.lastTime = time.time()
-
-	def setState(self, state, stateRemainingTime=None, stateData=None):
-		self.state = state
-		self.stateRemainingTime = stateRemainingTime
-		self.stateData = stateData
-
-	def isStateEnding(self):
-		return self.stateRemainingTime is not None and self.stateRemainingTime <= 0
+		self.state = GameState()
 
 	def update(self):
-		currentTime = time.time()
-		if self.stateRemainingTime is not None:
-			self.stateRemainingTime -= currentTime - self.lastTime
-		self.lastTime = currentTime
-		LOG.info("%s %s", self.state, self.stateRemainingTime)
 
-		if self.state == "falling":
-			if self.isStateEnding():
+		if self.state.name == "falling":
+			if self.state.status == "ending":
 				isLastStep = self.grid.fallStep()
 				if not isLastStep:
-					self.setState("falling", .1)
+					self.state.jumpTo("falling", .1)
 				else:
 					self.scoreMultiplier = 1
 					combos = self.grid.testComboAll()
 					if combos:
-						self.setState("combo", 1., combos)
+						self.state.jumpTo("combo", 1., combos)
 					else:
-						self.setState("running", .5)
+						self.state.jumpTo("running", .5)
 
-		elif self.state == "combo":
-			if self.isStateEnding():
-				self.processCombo(self.stateData)
-				self.setState("falling", .1)
+		elif self.state.name == "combo":
+			if self.state.status == "ending":
+				self.processCombo(self.state.data)
+				self.state.jumpTo("falling", .1)
 
-		elif self.state == "running":
-			if self.isStateEnding():
-				randPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
-				self.grid.swap(*randPos)
+		elif self.state.name == "running":
+			if self.state.status == "starting":
+				self.swapperPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
+			if self.state.status == "ending":
+				self.grid.swap(*self.swapperPos)
 
-				self.setState("falling", .1)
+				self.state.jumpTo("falling", .1)
 
-		elif self.state == "init":
-			self.setState("running", 1.)
+		elif self.state.name == "init":
+			self.state.jumpTo("running", 1.)
+
+		self.state.update()
 
 	def processCombo(self, combos):
 		combosPos = set(itertools.chain.from_iterable(combos))
@@ -102,6 +91,45 @@ class Game(object):
 		for pos in combosPos: # Remove combos
 			self.grid[pos] = 0
 
+class GameState(object):
+	"""Represents the current state of the game
+
+A game state can have finite or infinite duration (None value).
+A status attribute describe whether the state is starting, ongoing or ending.
+If necessary, data can be stored for the purpose of game state logic."""
+
+	def __init__(self):
+		# "init", "running", "falling", "combo"
+		self.name = "init"
+		self.data = None # Data conveyed by the state
+		self.remainingTime = None
+		self.duration = None
+		self.status = "starting" # One of "starting", "ongoing", "ending"
+
+		self.lastTime = time.time()
+
+	def __repr__(self):
+		return "GameState({self.name},{self.status},{self.remainingTime:.2f},{self.duration},{self.data})".format(self=self)
+
+	def update(self):
+		if self.remainingTime != None and self.remainingTime <= 0:
+			self.status = "ending"
+		elif self.status == "starting" and self.remainingTime != self.duration:
+			self.status = "ongoing"
+
+		currentTime = time.time()
+		if self.remainingTime is not None:
+			self.remainingTime -= currentTime - self.lastTime
+		self.lastTime = currentTime
+
+		LOG.info("%s", repr(self))
+
+	def jumpTo(self, name, duration=None, data=None):
+		self.name = name
+		self.duration = duration
+		self.remainingTime = duration
+		self.status = "starting"
+		self.data = data
 
 class Grid(object):
 

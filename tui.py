@@ -59,22 +59,30 @@ class TUI(object):
 			raise urwid.ExitMainLoop()
 
 	def run(self):
-		self.mainLoop.set_alarm_in(1, self.step)
+		self.mainLoop.set_alarm_in(1, self.update)
 		self.mainLoop.run()
 
-	def step(self, loop, user_data):
-		try:
-			self.game.update()
-			self.updateUI()
-		except Exception as e:
-			print(e)
-			raise ExitMainLoop from e
-		self.mainLoop.set_alarm_in(.05, self.step)
+	def update(self, loop, userData):
+		self.game.update()
+		self.updateUI()
+		self.mainLoop.set_alarm_in(.05, self.update)
 
 	def buildMarkup(self, grid):
-		out = [[(TUI.COLORS[grid[i][j]][0], '  ')\
-		for i in range(grid.width)] + ['\n'] for j in range(grid.height)]
-		#print(out)
+		out = []
+		color, chars = None, None
+		for y in range(grid.height):
+			for x in range(grid.width):
+				color, chars = TUI.COLORS[grid[x][y]][0], '  '
+				if self.game.state.name == "running" and self.game.state.status != "starting":
+					spx, spy = self.game.swapperPos
+					if spy == y and spx == x:
+						chars = '>-'
+					elif spy == y and spx+1 == x:
+						chars = '-<'
+				out.append((color, chars))
+			out.append('\n')
+		#out = [[(TUI.COLORS[grid[i][j]][0], '  ')\
+		#for i in range(grid.width)] + ['\n'] for j in range(grid.height)]
 		return out
 
 if __name__ == '__main__':
