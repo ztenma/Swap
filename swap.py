@@ -36,7 +36,7 @@ BG_LCOLORS = ['\033[40m', '\033[101m', '\033[103m', '\033[104m', '\033[102m', '\
 BG_DCOLORS = ['\033[40m', '\033[41m', '\033[43m', '\033[44m', '\033[42m', '\033[45m', '\033[46m']
 fgcolors = lambda i: FG_DCOLORS[i] if i < 7 else '\033[97m'
 bgcolors = lambda i: BG_DCOLORS[i] if i < 7 else '\033[97m'
-SCORES = [1, 5, 20, 80, 200, 500, 1000, 2000, 4000, 6000, 8000, 10000]
+SCORES = [2, 5, 20, 80, 200, 500, 1000, 2000, 4000, 6000, 8000, 10000]
 scoreIt = lambda x: SCORES[x-3] if x <= 10 else 0
 
 class Game(object):
@@ -50,55 +50,36 @@ class Game(object):
 		self.grid = Grid(15, 20, 4)
 
 		self.state = StateMachine()
+		self.state.new("running", 1)
 
-	"""def update(self):
+	def update(self):
 
-		if self.state.name == "running":
-			if self.state.status == "starting":
+		if "running" in self.state:
+			if self.state["running"].status == "starting":
 				self.swapperPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
-			elif self.state.status == "ending":
+			elif self.state["running"].status == "ending":
 				self.grid.swap(*self.swapperPos)
+				self.state.new("falling", .2)
+				self.state.alter("running", 2)
 
+		if "falling" in self.state:
+			if self.state["falling"].status == "ending":
 				isLastStep = self.grid.fallStep()
 				if isLastStep:
 					combos = self.grid.testComboAll()
 					if combos:
-						self.processCombos(combos)
+						self.state.new("combo", 1, combos)
 					else:
 						self.scoreMultiplier = 1
-				self.state.jumpTo("running", .2)
-
-		self.state.update()
-"""
-	def update(self):
-
-		if self.state.name == "falling":
-			if self.state.status == "ending":
-				isLastStep = self.grid.fallStep()
-				if not isLastStep:
-					self.state.jumpTo("falling", .1)
+					self.state.delete("falling")
 				else:
-					combos = self.grid.testComboAll()
-					if combos:
-						self.state.jumpTo("combo", 1., combos)
-					else:
-						self.scoreMultiplier = 1
-						self.state.jumpTo("running", .5)
+					self.state.alter("falling", .2)
+				LOG.info("Score multiplier %s", repr(self.scoreMultiplier))
 
-		elif self.state.name == "combo":
-			if self.state.status == "ending":
-				self.processCombos(self.state.data)
-				self.state.jumpTo("falling", .1)
-
-		elif self.state.name == "running":
-			if self.state.status == "starting":
-				self.swapperPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
-			if self.state.status == "ending":
-				self.grid.swap(*self.swapperPos)
-				self.state.jumpTo("falling", .1)
-
-		elif self.state.name == "init":
-			self.state.jumpTo("running", 1.)
+		if "combo" in self.state:
+			if self.state["combo"].status == "ending":
+				self.processCombos(self.state["combo"].data)
+				self.state.delete("combo")
 
 		self.state.update()
 
@@ -110,37 +91,42 @@ class Game(object):
 		for pos in combosPos: # Remove combos
 			self.grid[pos] = 0
 
-class StateMachine(dict): # TODO: test and use
+class StateMachine(dict):
 	"""Represents a dynamic concurrent state machine"""
 
 	def __init__(self):
+		dict.__init__(self)
 		self.lastTime = time.time()
 
 	def new(self, stateName, duration=None, data=None):
 		self[stateName] = State(duration, data)
 
-	def alter(self, oldStateName, stateName, duration=None, data=None):
-		self[stateName] = State(duration, data)
-		del self[oldStateName]
+	def alter(self, stateName, duration=None, data=None, old=None):
+		if old: del self[old]
+		self[stateName].__init__(duration, data)
+		#LOG.info("Alter\n%s", repr(self))
+
+	def delete(self, stateName):
+		del self[stateName]
 
 	def update(self):
 		currentTime = time.time()
 		dt = currentTime - self.lastTime
 
-		for state in self.itervalues():
-			if state.remainingTime != None and state.remainingTime <= 0:
+		for state in self.values():
+			if state.elapsedTime != None and state.elapsedTime + dt >= state.duration:
 				state.status = "ending"
-			elif state.status == "starting" and state.remainingTime != state.duration:
+			elif state.status == "starting" and state.elapsedTime != 0:
 				state.status = "ongoing"
 
-			if state.remainingTime is not None:
-				state.remainingTime -= dt
+			if state.elapsedTime is not None:
+				state.elapsedTime += dt
 
 		self.lastTime = currentTime
 
-		LOG.info("%s", repr(self))
+		#LOG.info("Update\n%s", repr(self))
 
-class State(Struct):
+class State(object):
 	"""Represents a game state
 
 A state can have finite or infinite duration (None value).
@@ -148,49 +134,13 @@ A status attribute describe whether the state is starting, ongoing or ending.
 If necessary, data can be stored for the purpose of state logic."""
 
 	def __init__(self, duration=None, data=None):
-		self.data = data # Data conveyed by the state
-		self.remainingTime = duration
+		self.status = "starting" # One of "starting", "ongoing", "ending"
 		self.duration = duration
-		self.status = "starting" # One of "starting", "ongoing", "ending"
-
-'''class State(object):
-	"""Represents a game state
-
-A state can have finite or infinite duration (None value).
-A status attribute describe whether the state is starting, ongoing or ending.
-If necessary, data can be stored for the purpose of state logic."""
-
-	def __init__(self, name="init"):
-		self.name = name
-		self.data = None # Data conveyed by the state
-		self.remainingTime = None
-		self.duration = None
-		self.status = "starting" # One of "starting", "ongoing", "ending"
-
-		self.lastTime = time.time()
+		self.elapsedTime = 0
+		self.data = data # Data conveyed by the state
 
 	def __repr__(self):
-		return "GameState({self.name},{self.status},{self.remainingTime:.2f},{self.duration},{self.data})".format(self=self)
-
-	def update(self):
-		if self.remainingTime != None and self.remainingTime <= 0:
-			self.status = "ending"
-		elif self.status == "starting" and self.remainingTime != self.duration:
-			self.status = "ongoing"
-
-		currentTime = time.time()
-		if self.remainingTime is not None:
-			self.remainingTime -= currentTime - self.lastTime
-		self.lastTime = currentTime
-
-		LOG.info("%s", repr(self))
-
-	def jumpTo(self, name, duration=None, data=None):
-		self.name = name
-		self.duration = duration
-		self.remainingTime = duration
-		self.status = "starting"
-		self.data = data'''
+		return "State({self.status},{self.elapsedTime:.2f}/{self.duration:.2f},{self.data})".format(self=self)
 
 class Grid(object):
 

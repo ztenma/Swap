@@ -65,7 +65,7 @@ class TUI(object):
 	def update(self, loop, userData):
 		self.game.update()
 		self.updateUI()
-		self.mainLoop.set_alarm_in(.05, self.update)
+		self.mainLoop.set_alarm_in(.04, self.update)
 
 	def buildMarkup(self, grid):
 		out = []
