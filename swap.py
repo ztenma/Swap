@@ -18,7 +18,7 @@ Battle vs CPU/Human
 
 import sys
 from random import randrange
-import time
+from time import time, sleep, strftime
 import itertools
 from collections import UserDict
 
@@ -29,13 +29,11 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 def timestamp():
-	return time.strftime('%H:%M:%S') + "." + str(time.time()).split('.')[1][:2]
+	return strftime('%H:%M:%S') + "." + str(time()).split('.')[1][:2]
 def DEBUG(msg, *args): logger.debug(timestamp() + " " + msg, *args)
 def INFO(msg, *args): logger.info(timestamp() + " " + msg, *args)
 def WARN(msg, *args): logger.warning(timestamp() + " " + msg, *args)
 def ERROR(msg, *args): logger.error(timestamp() + " " + msg, *args)
-
-INFO("Starting Swap")
 
 RESET_COLOR = '\033[0m'
 FG_DCOLORS = ['\033[90m', '\033[91m', '\033[93m', '\033[94m', '\033[92m', '\033[95m', '\033[96m']
@@ -53,7 +51,7 @@ class Game(object):
 
 		self.state = StateMachine()
 		self.state.new("IA_swap", 2)
-		self.lastTime = time.time()
+		self.lastTime = time()
 		self.pause = False
 
 		self.swapperPos = (0, 0)
@@ -61,29 +59,31 @@ class Game(object):
 		self.score = 0
 		self.scoreMultiplier = 1
 
-	# TODO: détruire combo group indépendamment de falling? dépend du gameplay
-	#       vérifier que les actions différées (combos, etc) existent toujours avant leur réalisation
+		INFO("Starting Swap")
+
+	# TODO: vérifier actions différées (combos, etc) existent encore avant réalisation
 	def update(self):
 
-		currentTime = time.time()
+		currentTime = time()
 		dt = currentTime - self.lastTime
 		self.lastTime = currentTime
 
 		if self.pause: return
 
-		DEBUG("State %s", self.state.trepr())
+		DEBUG("State %s", self.state.crepr())
+
 		for stateName in tuple(self.state.keys()):
 
 			if stateName == "IA_swap":
 				if self.state["IA_swap"].status == "starting":
 					#DEBUG("IA_swap/")
-					self.swapperPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
+					self.swapperPos = self.randomSwapChoice()#randrange(self.grid.width-1), randrange(self.grid.height-1)
 				elif self.state["IA_swap"].status == "ending":
 					#DEBUG("IA_swap\\")
 					self.grid.swap(*self.swapperPos)
 					if not "fall" in self.state:
 						self.state.new("fall", .2)
-					self.state.alter("IA_swap", .3)
+					self.state.alter("IA_swap", 2)
 
 			elif stateName == "fall":
 				#DEBUG("Falling %s", "{:.2f}/{:.2f}".format(\
@@ -103,7 +103,7 @@ class Game(object):
 							self.scoreMultiplier = 1
 						self.state.delete("fall")
 					else:
-						self.state.alter("fall", .2)
+						self.state.alter("fall", .1)
 
 			elif stateName.startswith("combo#"):
 				if self.state[stateName].status == "ending":
@@ -122,6 +122,9 @@ class Game(object):
 		comboGroupPos = set(itertools.chain.from_iterable(comboGroup))
 		for pos in comboGroupPos: # Remove combos
 			self.grid[pos] = 0
+
+	def randomSwapChoice(self):
+		return self.grid.getRandomSwap()
 
 class StateMachine(dict):
 	"""Represents a dynamic concurrent state machine"""
@@ -150,7 +153,9 @@ class StateMachine(dict):
 
 	def new(self, stateName, duration=None, data=None):
 		"""Add a new state to the machine"""
-		if stateName in self: DEBUG("Warning: replacing state with new()")
+		if stateName in self:
+			DEBUG("Warning: replacing state with new()")
+			raise KeyError("State already exist")
 		self[stateName] = State(duration, data)
 
 	def alter(self, stateName, duration=None, data=None, old=None):
@@ -342,91 +347,22 @@ Return set of positions of blocks combinated"""
 
 		return comboGroup
 
-def rotateMatrix(mat):
-	return [[mat[y][x] for y in range(len(mat))] for x in range(len(mat[0]))]
+	def getRandomBlock(self):
+		totalBlockNb = sum(block != 0 for col in self for block in col)
+		chosenBlock = randrange(totalBlockNb)
+		curBlock = -1
+		for x in range(self.width):
+			for y in range(self.height):
+				if self[x][y] != 0:
+					curBlock += 1
+				if curBlock == chosenBlock:
+					return (x, y)
 
-
-def test1():
-	_grid = rotateMatrix(\
-	[[3, 4, 2, 2, 3, 4],
-	[3, 0, 1, 4, 0, 3],
-	[3, 2, 0, 2, 0, 3],
-	[1, 1, 0, 2, 4, 3]])
-	grid = Grid(data=_grid, nbSymbols=5)
-	print('init\n' + str(grid))
-	pos = (2, 1)
-
-	grid.fallInstant()
-	print('fallInstant\n' + str(grid))
-	grid.swap(*pos)
-	print('swap 2,1\n' + str(grid))
-	grid.fallInstant(pos[0])
-	print('fallInstant\n' + str(grid))
-
-	combos = grid.testComboAll()
-	combosPos = set(itertools.chain.from_iterable(combos))
-	for pos in combosPos: # Remove combos
-		grid[pos] = 0
-	print('testCombo {}:'.format(pos), combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
-
-	grid.fallInstant()
-	print('fallInstant\n' + str(grid))
-
-def test2():
-	grid = Grid(data=[[randrange(4) for _ in range(20)] for _ in range(40)], nbSymbols=4)
-	#grid = Grid(40, 20, 4)
-	print('init\n' + str(grid))
-
-	score, scoreMultiplier = 0, 1
-	combos = True
-	while combos:
-		lastStep = grid.fallStep()
-		print('fallStep', lastStep, '\n' + str(grid))
-		print('score:', score)
-		time.sleep(.2)
-		if not lastStep: continue
-
-		combos = grid.testComboAll()
-		combosPos = set(itertools.chain.from_iterable(combos))
-		#print(combos, combosPos)
-		if combos:
-			for combo in combos:
-				score += scoreIt(len(combo)) * scoreMultiplier
-				#print(len(combo), scoreIt(len(combo)), end=' ')
-			#print()
-			scoreMultiplier += 1
-			for pos in combosPos: # Remove combos
-				grid[pos] = 0
-			print('testComboAll:', combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
-			time.sleep(1)
-
-def test3():
-	_grid = rotateMatrix([
-[1,1,0,1,2,0,3,2,1,1,0,1,3,0,1,0,1,3,2,3,2,0,1,0,1,1,0,1,3,0,0,0,0,0,0,0,3,1,0,3],
-[0,0,1,1,0,3,1,3,0,0,0,2,0,3,3,3,2,1,0,0,1,3,2,3,2,0,3,2,1,2,1,1,2,1,3,1,2,3,0,0],
-[3,3,0,3,0,1,2,1,3,3,2,1,2,3,1,1,0,3,0,1,2,0,2,1,0,2,1,1,0,2,0,3,0,1,1,3,1,3,2,2],
-[2,3,0,2,1,3,3,0,1,0,1,0,1,0,3,1,1,0,3,0,0,0,0,1,3,3,3,2,2,2,0,2,1,0,3,3,2,0,1,3],
-[0,1,0,3,0,0,2,0,0,3,0,3,0,0,2,1,0,0,2,0,2,3,3,3,1,0,3,0,1,3,1,2,3,1,2,1,0,2,2,3],
-[3,1,3,1,2,0,2,3,3,1,3,0,3,1,0,3,1,0,3,3,3,2,0,1,2,2,0,1,2,3,0,1,0,2,2,0,2,0,0,0],
-[2,2,3,2,0,0,0,1,3,0,3,1,1,0,2,0,2,1,3,2,3,1,3,2,3,3,3,0,3,1,3,0,3,1,1,1,1,0,2,0],
-[3,3,3,0,0,1,1,2,1,1,2,2,1,0,2,2,0,1,0,0,2,0,2,3,2,3,1,1,0,1,1,3,1,2,0,1,2,2,0,1],
-[1,2,1,3,2,0,2,0,1,2,0,0,0,2,3,1,2,2,1,3,2,0,1,3,2,2,2,1,0,1,3,1,0,3,1,1,3,2,2,0],
-[0,2,2,2,1,1,0,2,1,1,1,3,2,3,1,2,3,0,3,1,0,1,3,3,1,2,1,2,0,0,3,2,3,0,0,2,2,1,1,1],
-[0,3,2,3,0,0,2,3,0,1,1,0,3,0,0,1,1,3,1,0,1,2,0,1,2,2,2,3,3,1,3,2,3,3,2,0,1,2,0,2],
-[2,1,0,3,1,0,3,0,0,1,3,1,0,1,0,2,0,0,1,2,2,2,2,3,2,3,1,1,2,3,0,2,2,0,3,2,0,0,2,2],
-[3,0,3,1,0,3,2,0,3,1,2,2,3,3,2,1,2,2,3,2,0,3,2,2,3,1,2,2,0,2,3,2,1,2,0,0,0,1,3,0],
-[1,2,0,0,0,0,1,2,1,0,3,3,1,0,2,1,1,2,1,2,0,3,1,2,3,1,3,2,3,0,3,0,0,2,2,3,1,2,3,2],
-[1,0,1,0,2,2,0,0,1,1,0,3,3,3,2,2,3,0,1,2,0,0,3,0,2,0,1,3,1,2,3,3,0,3,0,0,1,2,1,2],
-[0,0,2,1,3,1,2,3,0,2,1,0,3,1,0,3,3,2,0,0,1,2,3,0,3,2,3,3,1,1,1,0,2,1,2,1,0,2,1,3],
-[3,3,3,0,0,1,0,2,0,2,1,3,1,1,3,3,1,0,2,0,3,2,3,0,1,2,0,0,0,1,0,0,2,3,3,2,1,1,0,2],
-[1,0,3,1,1,0,1,0,2,3,1,2,3,1,1,2,2,2,1,3,3,1,1,3,1,1,0,2,3,3,3,3,0,1,3,0,1,1,3,0],
-[2,1,3,1,2,1,2,1,3,0,3,2,3,1,2,2,0,1,1,1,1,1,1,2,1,3,1,2,3,3,2,0,2,3,2,2,0,3,3,1],
-[1,2,3,1,2,1,1,3,0,0,1,0,1,0,1,1,2,1,2,0,0,1,2,2,0,1,1,3,2,3,1,3,2,1,3,2,1,3,2,3]
-])
-	grid = Grid(data=_grid, nbSymbols=4)
-	print('init\n' + str(grid))
-	return grid
+	def getRandomSwap(self):
+		randX, randY = self.getRandomBlock()
+		if randX == 0: return (randX, randY)
+		if randX == self.width - 1: return (randX - 1, randY)
+		return (randX - randrange(2), randY)
 
 if __name__ == '__main__':
-	#print("\033[104mkuro\033[00mmatsu")
-	test2()
+	pass
