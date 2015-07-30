@@ -24,11 +24,18 @@ from collections import UserDict
 
 import logging
 logging.basicConfig(filename='swap.log', filemode='w', level=logging.DEBUG, \
-format='%(asctime)s %(message)s')
-LOG = logging.getLogger(__name__)
-LOG.addHandler(logging.NullHandler())
+format='%(message)s')
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
-LOG.info("Starting Swap")
+def timestamp():
+	return time.strftime('%H:%M:%S') + "." + str(time.time()).split('.')[1][:2]
+def DEBUG(msg, *args): logger.debug(timestamp() + " " + msg, *args)
+def INFO(msg, *args): logger.info(timestamp() + " " + msg, *args)
+def WARN(msg, *args): logger.warning(timestamp() + " " + msg, *args)
+def ERROR(msg, *args): logger.error(timestamp() + " " + msg, *args)
+
+INFO("Starting Swap")
 
 RESET_COLOR = '\033[0m'
 FG_DCOLORS = ['\033[90m', '\033[91m', '\033[93m', '\033[94m', '\033[92m', '\033[95m', '\033[96m']
@@ -42,53 +49,78 @@ scoreIt = lambda x: SCORES[x-3] if x <= 10 else 0
 class Game(object):
 
 	def __init__(self):
+		self.grid = Grid(15, 20, 4)
+
+		self.state = StateMachine()
+		self.state.new("IA_swap", 2)
+		self.lastTime = time.time()
+		self.pause = False
+
 		self.swapperPos = (0, 0)
 
 		self.score = 0
 		self.scoreMultiplier = 1
 
-		self.grid = Grid(15, 20, 4)
-
-		self.state = StateMachine()
-		self.state.new("running", 1)
-
+	# TODO: détruire combo group indépendamment de falling? dépend du gameplay
+	#       vérifier que les actions différées (combos, etc) existent toujours avant leur réalisation
 	def update(self):
 
-		if "running" in self.state:
-			if self.state["running"].status == "starting":
-				self.swapperPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
-			elif self.state["running"].status == "ending":
-				self.grid.swap(*self.swapperPos)
-				self.state.new("falling", .2)
-				self.state.alter("running", 2)
+		currentTime = time.time()
+		dt = currentTime - self.lastTime
+		self.lastTime = currentTime
 
-		if "falling" in self.state:
-			if self.state["falling"].status == "ending":
-				isLastStep = self.grid.fallStep()
-				if isLastStep:
-					combos = self.grid.testComboAll()
-					if combos:
-						self.state.new("combo", 1, combos)
+		if self.pause: return
+
+		DEBUG("State %s", self.state.trepr())
+		for stateName in tuple(self.state.keys()):
+
+			if stateName == "IA_swap":
+				if self.state["IA_swap"].status == "starting":
+					#DEBUG("IA_swap/")
+					self.swapperPos = randrange(self.grid.width-1), randrange(self.grid.height-1)
+				elif self.state["IA_swap"].status == "ending":
+					#DEBUG("IA_swap\\")
+					self.grid.swap(*self.swapperPos)
+					if not "fall" in self.state:
+						self.state.new("fall", .2)
+					self.state.alter("IA_swap", .3)
+
+			elif stateName == "fall":
+				#DEBUG("Falling %s", "{:.2f}/{:.2f}".format(\
+				#	self.state[stateName].elapsedTime, self.state[stateName].duration))
+				if self.state["fall"].status == "ending":
+					#DEBUG("fall\\")
+					isLastStep = self.grid.fallStep()
+					if isLastStep:
+						comboGroup = self.grid.testComboAll()
+						if comboGroup:
+							comboNb = sum(1 for name in self.state if name.startswith("combo#"))
+							comboGroups = list(self.state[name].data for name in self.state if name.startswith("combo#"))
+							#DEBUG("Combo groups %s in %s", comboGroup, comboGroups)
+							if not comboGroup in comboGroups:
+								self.state.new("combo#" + str(comboNb), 1, comboGroup)
+						else:
+							self.scoreMultiplier = 1
+						self.state.delete("fall")
 					else:
-						self.scoreMultiplier = 1
-					self.state.delete("falling")
-				else:
-					self.state.alter("falling", .2)
-				LOG.info("Score multiplier %s", repr(self.scoreMultiplier))
+						self.state.alter("fall", .2)
 
-		if "combo" in self.state:
-			if self.state["combo"].status == "ending":
-				self.processCombos(self.state["combo"].data)
-				self.state.delete("combo")
+			elif stateName.startswith("combo#"):
+				if self.state[stateName].status == "ending":
+					#DEBUG("%s\\", stateName)
+					#DEBUG("Combos %s\n%s", stateName, self.state[stateName].data)
+					self.processCombos(self.state[stateName].data)
+					self.state.delete(stateName)
 
-		self.state.update()
+		self.state.update(dt)
 
-	def processCombos(self, combos):
-		combosPos = set(itertools.chain.from_iterable(combos))
-		for combo in combos:
+	def processCombos(self, comboGroup):
+		for combo in comboGroup:
 			self.score += scoreIt(len(combo)) * self.scoreMultiplier
 		self.scoreMultiplier += 1
-		for pos in combosPos: # Remove combos
+		#DEBUG("Score multiplier %s", self.scoreMultiplier)
+		comboGroupPos = set(itertools.chain.from_iterable(comboGroup))
+		for pos in comboGroupPos: # Remove combos
 			self.grid[pos] = 0
 
 class StateMachine(dict):
@@ -96,22 +128,43 @@ class StateMachine(dict):
 
 	def __init__(self):
 		dict.__init__(self)
-		self.lastTime = time.time()
+
+	def crepr(self, onlyChanging=False):
+		"""A compact representation"""
+		shortenStatus = lambda s: {'starting': '/', 'ongoing': '', 'ending': '\\'}[s]
+		isChanging = lambda s: self[s].status in ("starting", "ending")
+		if not onlyChanging: return '{' + ', '.join("{}{}".format(name, shortenStatus(self[name].status)) for name in self) + '}'
+		return '{' + ', '.join("{}{}".format(name, shortenStatus(self[name].status)) for name in self if isChanging(name)) + '}'
+
+	def vcrepr(self, onlyChanging=False):
+		"""A very compact representation"""
+		shortenName = lambda s: {'debug': 'D ', 'IA_swap': 'S ', 'fall': 'F ', 'combo': 'C '}[s.split('#')[0]]
+		isChanging = lambda s: self[s].status in ("starting", "ending")
+		if not onlyChanging: return ''.join("{}".format(shortenName(name)) for name in self)
+		return ''.join("{}".format(shortenName(name)) for name in self if isChanging(name))
+
+	def trepr(self):
+		"""A representation of progression of states"""
+		return '[' + ', '.join("{} {:.2f}/{:.2f}".format(name,
+			self[name].elapsedTime, self[name].duration) for name in self) + ']'
 
 	def new(self, stateName, duration=None, data=None):
+		"""Add a new state to the machine"""
+		if stateName in self: DEBUG("Warning: replacing state with new()")
 		self[stateName] = State(duration, data)
 
 	def alter(self, stateName, duration=None, data=None, old=None):
+		"""Alter an existing state. It updates stateName, or old if specified."""
 		if old: del self[old]
 		self[stateName].__init__(duration, data)
-		#LOG.info("Alter\n%s", repr(self))
+		#DEBUG("Alter\n%s", repr(self))
 
 	def delete(self, stateName):
+		"""Delete a state"""
 		del self[stateName]
 
-	def update(self):
-		currentTime = time.time()
-		dt = currentTime - self.lastTime
+	def update(self, dt):
+		"""Update all the states the machine owns, delete states that have to."""
 
 		for state in self.values():
 			if state.elapsedTime != None and state.elapsedTime + dt >= state.duration:
@@ -122,9 +175,7 @@ class StateMachine(dict):
 			if state.elapsedTime is not None:
 				state.elapsedTime += dt
 
-		self.lastTime = currentTime
-
-		#LOG.info("Update\n%s", repr(self))
+		#DEBUG("Update\n%s", repr(self))
 
 class State(object):
 	"""Represents a game state
@@ -229,7 +280,7 @@ class Grid(object):
 
 	def testComboLine(self, y):
 		"""Look for combos in line and return them"""
-		combos = []
+		comboGroup = []
 		comboCount = 1
 
 		#print('line:', [self[i][y] for i in range(self.width)])
@@ -241,15 +292,15 @@ class Grid(object):
 				comboCount += 1
 			if self[x-1][y] != ref:
 				if comboCount >= 3:
-					combos.append([(i, y) for i in range(x-comboCount, x)])
+					comboGroup.append([(i, y) for i in range(x-comboCount, x)])
 				comboCount = 1
 			if x == self.width - 1 and comboCount >= 3:
-				combos.append([(i, y) for i in range(x-comboCount+1, x+1)])
-		return combos
+				comboGroup.append([(i, y) for i in range(x-comboCount+1, x+1)])
+		return comboGroup
 
 	def testComboColumn(self, x):
 		"""Look for combos in column and return them"""
-		combos = []
+		comboGroup = []
 		comboCount = 1
 
 		#print('column:', [self[x][j] for j in range(self.height)])
@@ -261,35 +312,35 @@ class Grid(object):
 				comboCount += 1
 			if ref != self[x][y-1]:
 				if comboCount >= 3:
-					combos.append([(x, j) for j in range(y-comboCount, y)])
+					comboGroup.append([(x, j) for j in range(y-comboCount, y)])
 				comboCount = 1
 			if y == self.height - 1 and comboCount >= 3:
-				combos.append([(x, j) for j in range(y-comboCount+1, y+1)])
-		return combos
+				comboGroup.append([(x, j) for j in range(y-comboCount+1, y+1)])
+		return comboGroup
 
 	def testComboSwap(self, x, y):
 		"""Test existance of combos at the designated swap position
 Return set of positions of blocks combinated"""
-		combos = []
+		comboGroup = []
 
-		combos.extend(self.testComboLine(y))
-		combos.extend(self.testComboColumn(x))
-		combos.extend(self.testComboColumn(x+1))
+		comboGroup.extend(self.testComboLine(y))
+		comboGroup.extend(self.testComboColumn(x))
+		comboGroup.extend(self.testComboColumn(x+1))
 
-		return combos
+		return comboGroup
 
 	def testComboAll(self):
 		"""Test existance of combos in the whole grid
 Return set of positions of blocks combinated"""
-		combos = []
+		comboGroup = []
 
 		for x in range(self.width):
-			combos.extend(self.testComboColumn(x))
+			comboGroup.extend(self.testComboColumn(x))
 
 		for y in range(self.height):
-			combos.extend(self.testComboLine(y))
+			comboGroup.extend(self.testComboLine(y))
 
-		return combos
+		return comboGroup
 
 def rotateMatrix(mat):
 	return [[mat[y][x] for y in range(len(mat))] for x in range(len(mat[0]))]
