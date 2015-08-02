@@ -9,8 +9,8 @@ import swap
 from swap import INFO, DEBUG, WARN, ERROR
 
 class TUI(object):
-	COLORS = [('k', 'black'), ('w', 'brown'), ('b', 'dark blue'), ('r', 'dark red'),
-	('g', 'dark green'), ('m', 'dark magenta'), ('c', 'dark cyan'), ('z', 'light gray')]
+	COLORS = [('k', 'black'), ('r', 'dark red'), ('w', 'brown'), ('b', 'dark blue'),
+	('g', 'dark green'), ('m', 'dark magenta'), ('c', 'dark cyan')]
 
 	def __init__(self):
 		self.game = swap.Game()

@@ -20,7 +20,6 @@ import sys
 from random import randrange
 from time import time, sleep, strftime
 import itertools
-from collections import UserDict
 
 import logging
 logging.basicConfig(filename='swap.log', filemode='w', level=logging.DEBUG, \
@@ -35,8 +34,16 @@ def INFO(msg, *args): logger.info(timestamp() + " " + msg, *args)
 def WARN(msg, *args): logger.warning(timestamp() + " " + msg, *args)
 def ERROR(msg, *args): logger.error(timestamp() + " " + msg, *args)
 
+try:
+	from collections.abc import Sequence, MutableSequence
+	print("Imported collections.abc")
+except ImportError:
+	from collections import Sequence, MutableSequence
+	print("Imported collections")
+
 RESET_COLOR = '\033[0m'
 FG_DCOLORS = ['\033[90m', '\033[91m', '\033[93m', '\033[94m', '\033[92m', '\033[95m', '\033[96m']
+# bg colors order: black, red, yellow(=brown), blue, green, magenta, cyan
 BG_LCOLORS = ['\033[40m', '\033[101m', '\033[103m', '\033[104m', '\033[102m', '\033[105m', '\033[106m']
 BG_DCOLORS = ['\033[40m', '\033[41m', '\033[43m', '\033[44m', '\033[42m', '\033[45m', '\033[46m']
 fgcolors = lambda i: FG_DCOLORS[i] if i < 7 else '\033[97m'
@@ -50,7 +57,7 @@ class Game(object):
 		self.grid = Grid(15, 20, 4)
 
 		self.state = StateMachine()
-		self.state.new("IA_swap", 2)
+		self.state.transition("IA_swap", 2)
 		self.lastTime = time()
 		self.pause = False
 
@@ -81,9 +88,9 @@ class Game(object):
 				elif self.state["IA_swap"].status == "ending":
 					#DEBUG("IA_swap\\")
 					self.grid.swap(*self.swapperPos)
-					if not "fall" in self.state:
-						self.state.new("fall", .2)
-					self.state.alter("IA_swap", 2)
+					if "fall" not in self.state:
+						self.state.transition("fall", .2)
+					self.state.transition("IA_swap", 2)
 
 			elif stateName == "fall":
 				#DEBUG("Falling %s", "{:.2f}/{:.2f}".format(\
@@ -98,18 +105,32 @@ class Game(object):
 							comboGroups = list(self.state[name].data for name in self.state if name.startswith("combo#"))
 							#DEBUG("Combo groups %s in %s", comboGroup, comboGroups)
 							if not comboGroup in comboGroups:
-								self.state.new("combo#" + str(comboNb), 1, comboGroup)
+								self.state.transition("combo#" + str(comboNb), 1, comboGroup)
 						else:
 							self.scoreMultiplier = 1
 						self.state.delete("fall")
 					else:
-						self.state.alter("fall", .1)
+						self.state.transition("fall", .1)
 
 			elif stateName.startswith("combo#"):
 				if self.state[stateName].status == "ending":
 					#DEBUG("%s\\", stateName)
 					#DEBUG("Combos %s\n%s", stateName, self.state[stateName].data)
-					self.processCombos(self.state[stateName].data)
+					endComboGroup = self.grid.testComboAll()
+					startComboGroup = self.state[stateName].data
+
+					# TODO: tests
+					comboGroup = updateComboGroupLazy(startComboGroup, endComboGroup)
+					comboGroupPos = set(itertools.chain.from_iterable(comboGroup))
+
+					for combo in comboGroup:
+						self.score += scoreIt(len(combo)) * self.scoreMultiplier
+					self.scoreMultiplier += 1
+					#DEBUG("Score multiplier %s", self.scoreMultiplier)
+
+					for pos in comboGroupPos: # Remove combos
+						self.grid[pos] = 0
+					#self.processCombos(self.state[stateName].data)
 					self.state.delete(stateName)
 
 		self.state.update(dt)
@@ -126,11 +147,74 @@ class Game(object):
 	def randomSwapChoice(self):
 		return self.grid.getRandomSwap()
 
+def updateComboGroupLazy(comboGroup1, comboGroup2):
+	"""Computes the final combo group based on combo state start and end, using
+	the lazy startegy.
+
+	Lazy:
+	include any combo from start state that remains in end state"""
+
+	comboGroup3 = []
+
+	for combo2 in comboGroup2:
+		if combo2 in comboGroup1:
+			comboGroup3.append(combo2)
+	return comboGroup3
+
+def updateComboGroupMorph(comboGroup1, comboGroup2): # TODO: extensive tests
+	"""Computes the final combo group based on combo state start and end, using
+	the morph startegy.
+
+	Morph:
+	- compute the difference between the two sets of combo positions,
+	- include any combo from end state that has at least one position in common
+	with the difference set"""
+
+	# We compute the lists of blocks involved in each combo group
+	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
+	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
+	diffPos = comboPos1.intersection(comboPos2)
+	DEBUG("cp: %s %s", comboPos1, comboPos2)
+	DEBUG("diffPos: %s", diffPos)
+	comboGroup3 = []
+
+	for combo2 in comboGroup2:
+		for pos in diffPos:
+			if pos in combo2:
+				comboGroup3.append(combo2)
+	return comboGroup3
+
 class StateMachine(dict):
 	"""Represents a dynamic concurrent state machine"""
 
 	def __init__(self):
 		dict.__init__(self)
+
+	def transition(self, toStateName, duration=None, data=None, fromStateName=None):
+		"""Transition to another state. If specified, it replaces the state
+		named fromStateName."""
+		if fromStateName:
+			del self[fromStateName]
+		self[toStateName] = State(duration, data)
+		#DEBUG("Transition\n%s", repr(self))
+
+	def delete(self, stateName):
+		"""Delete a state"""
+		del self[stateName]
+
+	def update(self, dt):
+		"""Update all the states in the machine"""
+
+		for state in self.values():
+			if state.elapsedTime != None and state.elapsedTime + dt >= state.duration:
+				state.status = "ending"
+			elif state.status == "starting" and state.elapsedTime != 0:
+				state.status = "ongoing"
+
+			if state.elapsedTime is not None:
+				state.elapsedTime += dt
+
+		#DEBUG("Update\n%s", repr(self))
 
 	def crepr(self, onlyChanging=False):
 		"""A compact representation"""
@@ -150,37 +234,6 @@ class StateMachine(dict):
 		"""A representation of progression of states"""
 		return '[' + ', '.join("{} {:.2f}/{:.2f}".format(name,
 			self[name].elapsedTime, self[name].duration) for name in self) + ']'
-
-	def new(self, stateName, duration=None, data=None):
-		"""Add a new state to the machine"""
-		if stateName in self:
-			DEBUG("Warning: replacing state with new()")
-			raise KeyError("State already exist")
-		self[stateName] = State(duration, data)
-
-	def alter(self, stateName, duration=None, data=None, old=None):
-		"""Alter an existing state. It updates stateName, or old if specified."""
-		if old: del self[old]
-		self[stateName].__init__(duration, data)
-		#DEBUG("Alter\n%s", repr(self))
-
-	def delete(self, stateName):
-		"""Delete a state"""
-		del self[stateName]
-
-	def update(self, dt):
-		"""Update all the states the machine owns, delete states that have to."""
-
-		for state in self.values():
-			if state.elapsedTime != None and state.elapsedTime + dt >= state.duration:
-				state.status = "ending"
-			elif state.status == "starting" and state.elapsedTime != 0:
-				state.status = "ongoing"
-
-			if state.elapsedTime is not None:
-				state.elapsedTime += dt
-
-		#DEBUG("Update\n%s", repr(self))
 
 class State(object):
 	"""Represents a game state
@@ -297,10 +350,12 @@ class Grid(object):
 				comboCount += 1
 			if self[x-1][y] != ref:
 				if comboCount >= 3:
-					comboGroup.append([(i, y) for i in range(x-comboCount, x)])
+					combo = Combo([(i, y) for i in range(x-comboCount, x)], self[x-1][y])
+					comboGroup.append(combo)
 				comboCount = 1
 			if x == self.width - 1 and comboCount >= 3:
-				comboGroup.append([(i, y) for i in range(x-comboCount+1, x+1)])
+				combo = Combo([(i, y) for i in range(x-comboCount+1, x+1)], ref)
+				comboGroup.append(combo)
 		return comboGroup
 
 	def testComboColumn(self, x):
@@ -317,10 +372,12 @@ class Grid(object):
 				comboCount += 1
 			if ref != self[x][y-1]:
 				if comboCount >= 3:
-					comboGroup.append([(x, j) for j in range(y-comboCount, y)])
+					combo = Combo([(x, j) for j in range(y-comboCount, y)], self[x][y-1])
+					comboGroup.append(combo)
 				comboCount = 1
 			if y == self.height - 1 and comboCount >= 3:
-				comboGroup.append([(x, j) for j in range(y-comboCount+1, y+1)])
+				combo = Combo([(x, j) for j in range(y-comboCount+1, y+1)], ref)
+				comboGroup.append(combo)
 		return comboGroup
 
 	def testComboSwap(self, x, y):
@@ -363,6 +420,47 @@ Return set of positions of blocks combinated"""
 		if randX == 0: return (randX, randY)
 		if randX == self.width - 1: return (randX - 1, randY)
 		return (randX - randrange(2), randY)
+
+class Block(Sequence):
+	"""A tuple-like"""
+	def __init__(self, pos, color):
+		self.pos = pos
+		self.color = color
+
+	def __len__(self): return len(self.pos)
+	def __getitem__(self, i): return self.pos[i]
+
+	def __eq__(self, other): return self.pos == other.pos and self.color == other.color
+	def __hash__(self): return hash(self.pos)
+	def __repr__(self):
+		#return str(self.pos)
+		return "Block({}, {})".format(self.pos, self.color)
+	def __str__(self): return str(self.pos)
+
+class Combo(MutableSequence):
+	"""A list-like"""
+
+	def __init__(self, blockList, color=None):
+		assert isinstance(blockList, Sequence), "blockList must be a sequence"
+		if color != None and color > 0:
+			self.blockList = [Block(e, color) for e in blockList]
+			self.color = color
+		else:
+			assert all(isinstance(e, Block) for e in blockList), "if no color argument provided, blockList must be a sequence of Block objects"
+			self.blockList = blockList[:]
+			self.color = blockList[0].color
+
+	def __len__(self): return len(self.blockList)
+	def __getitem__(self, i): return self.blockList[i]
+	def __setitem__(self, i, v): self.blockList[i] = v
+	def __delitem__(self, i): del self.blockList[i]
+	def __iadd__(self, e): self.blockList += e
+	def append(self, e): self.blockList.append(e)
+	def insert(self, i, e): self.blockList.insert(i, e)
+
+	def __eq__(self, other): return self.blockList == other.blockList and self.color == other.color
+	def __repr__(self):
+		return "Combo({}, ".format(self.color) + repr(self.blockList) + ')'
 
 if __name__ == '__main__':
 	pass
