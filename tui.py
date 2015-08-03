@@ -10,7 +10,7 @@ from swap import INFO, DEBUG, WARN, ERROR
 
 class TUI(object):
 	COLORS = [('k', 'black'), ('r', 'dark red'), ('w', 'brown'), ('b', 'dark blue'),
-	('g', 'dark green'), ('m', 'dark magenta'), ('c', 'dark cyan')]
+	('g', 'dark green'), ('m', 'dark magenta'), ('c', 'dark cyan'), ('z', 'light gray')]
 
 	def __init__(self):
 		self.game = swap.Game()
@@ -66,8 +66,11 @@ class TUI(object):
 
 	def handleInput(self, key):
 		if key == ' ':
-			#INFO("Pause %s", self.game.pause)
 			self.game.pause = not self.game.pause
+		elif key in ('up', 'right', 'down', 'left'):
+			self.game.moveSwapper(key)
+		elif key == "x":
+			self.game.swap()
 		elif key == '+':
 			self.scoreLabel.base_widget.set_text("test")
 		elif key in ('q', 'Q'):

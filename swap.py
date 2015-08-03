@@ -44,8 +44,8 @@ except ImportError:
 RESET_COLOR = '\033[0m'
 FG_DCOLORS = ['\033[90m', '\033[91m', '\033[93m', '\033[94m', '\033[92m', '\033[95m', '\033[96m']
 # bg colors order: black, red, yellow(=brown), blue, green, magenta, cyan
-BG_LCOLORS = ['\033[40m', '\033[101m', '\033[103m', '\033[104m', '\033[102m', '\033[105m', '\033[106m']
-BG_DCOLORS = ['\033[40m', '\033[41m', '\033[43m', '\033[44m', '\033[42m', '\033[45m', '\033[46m']
+BG_LCOLORS = ['\033[40m', '\033[101m', '\033[103m', '\033[104m', '\033[102m', '\033[105m', '\033[106m', '\033[47m']
+BG_DCOLORS = ['\033[40m', '\033[41m', '\033[43m', '\033[44m', '\033[42m', '\033[45m', '\033[46m', '\033[47m']
 fgcolors = lambda i: FG_DCOLORS[i] if i < 7 else '\033[97m'
 bgcolors = lambda i: BG_DCOLORS[i] if i < 7 else '\033[97m'
 SCORES = [2, 5, 20, 80, 200, 500, 1000, 2000, 4000, 6000, 8000, 10000]
@@ -57,7 +57,7 @@ class Game(object):
 		self.grid = Grid(15, 20, 4)
 
 		self.state = StateMachine()
-		self.state.transition("IA_swap", 2)
+		#self.state.transition("IA_swap", 2)
 		self.lastTime = time()
 		self.pause = False
 
@@ -68,7 +68,6 @@ class Game(object):
 
 		INFO("Starting Swap")
 
-	# TODO: vérifier actions différées (combos, etc) existent encore avant réalisation
 	def update(self):
 
 		currentTime = time()
@@ -119,7 +118,6 @@ class Game(object):
 					endComboGroup = self.grid.testComboAll()
 					startComboGroup = self.state[stateName].data
 
-					# TODO: tests
 					comboGroup = updateComboGroupLazy(startComboGroup, endComboGroup)
 					comboGroupPos = set(itertools.chain.from_iterable(comboGroup))
 
@@ -131,6 +129,8 @@ class Game(object):
 					for pos in comboGroupPos: # Remove combos
 						self.grid[pos] = 0
 					#self.processCombos(self.state[stateName].data)
+					if "fall" not in self.state:
+						self.state.transition("fall", .2)
 					self.state.delete(stateName)
 
 		self.state.update(dt)
@@ -138,7 +138,7 @@ class Game(object):
 	def processCombos(self, comboGroup):
 		for combo in comboGroup:
 			self.score += scoreIt(len(combo)) * self.scoreMultiplier
-		self.scoreMultiplier += 1
+			self.scoreMultiplier += 1
 		#DEBUG("Score multiplier %s", self.scoreMultiplier)
 		comboGroupPos = set(itertools.chain.from_iterable(comboGroup))
 		for pos in comboGroupPos: # Remove combos
@@ -146,6 +146,18 @@ class Game(object):
 
 	def randomSwapChoice(self):
 		return self.grid.getRandomSwap()
+
+	def moveSwapper(self, direction):
+		x, y = self.swapperPos
+		if direction == 'up': self.swapperPos = (x, max(0, y-1))
+		elif direction == 'right': self.swapperPos = (min(x+1, self.grid.width-2), y)
+		elif direction == 'down': self.swapperPos = (x, min(y+1, self.grid.height-1))
+		elif direction == 'left': self.swapperPos = (max(x-1, 0), y)
+		else: raise ValueError("direction must be one of up, right, down, left")
+
+	def swap(self):
+		self.grid.swap(*self.swapperPos)
+		self.state.transition("fall", .2)
 
 def updateComboGroupLazy(comboGroup1, comboGroup2):
 	"""Computes the final combo group based on combo state start and end, using
@@ -185,7 +197,10 @@ def updateComboGroupMorph(comboGroup1, comboGroup2): # TODO: extensive tests
 	return comboGroup3
 
 class StateMachine(dict):
-	"""Represents a dynamic concurrent state machine"""
+	"""Represents a dynamic concurrent state machine.
+
+	It can hold mutiples states at the same time. States are timed.
+	update() update all states statuses."""
 
 	def __init__(self):
 		dict.__init__(self)
@@ -195,6 +210,7 @@ class StateMachine(dict):
 		named fromStateName."""
 		if fromStateName:
 			del self[fromStateName]
+		#TODO: if duration == 0: # directly call end callback
 		self[toStateName] = State(duration, data)
 		#DEBUG("Transition\n%s", repr(self))
 
@@ -216,26 +232,34 @@ class StateMachine(dict):
 
 		#DEBUG("Update\n%s", repr(self))
 
+	def _shortenStatus(self, status):
+		return {'starting': '/', 'ongoing': '', 'ending': '\\'}[status]
+
+	def _shortenName(self, stateName):
+		try:
+			return {'debug': 'D ', 'swap': 'S ', 'IA_swap': 's ', 'fall': 'F ', 'combo': 'C '}[stateName.split('#')[0]]
+		except KeyError:
+			raise KeyError("state name not registered")
+
+	def _isChanging(self, stateName):
+		return self[stateName].status in ("starting", "ending")
+
 	def crepr(self, onlyChanging=False):
 		"""A compact representation"""
-		shortenStatus = lambda s: {'starting': '/', 'ongoing': '', 'ending': '\\'}[s]
-		isChanging = lambda s: self[s].status in ("starting", "ending")
-		if not onlyChanging: return '{' + ', '.join("{}{}".format(name, shortenStatus(self[name].status)) for name in self) + '}'
-		return '{' + ', '.join("{}{}".format(name, shortenStatus(self[name].status)) for name in self if isChanging(name)) + '}'
+		if not onlyChanging: return '{' + ', '.join("{}{}".format(name, self._shortenStatus(self[name].status)) for name in self) + '}'
+		return '{' + ', '.join("{}{}".format(name, self._shortenStatus(self[name].status)) for name in self if self._isChanging(name)) + '}'
 
 	def vcrepr(self, onlyChanging=False):
 		"""A very compact representation"""
-		shortenName = lambda s: {'debug': 'D ', 'IA_swap': 'S ', 'fall': 'F ', 'combo': 'C '}[s.split('#')[0]]
-		isChanging = lambda s: self[s].status in ("starting", "ending")
-		if not onlyChanging: return ''.join("{}".format(shortenName(name)) for name in self)
-		return ''.join("{}".format(shortenName(name)) for name in self if isChanging(name))
+		if not onlyChanging: return ''.join("{}".format(self._shortenName(name)) for name in self)
+		return ''.join("{}".format(self._shortenName(name)) for name in self if self._isChanging(name))
 
 	def trepr(self):
 		"""A representation of progression of states"""
 		return '[' + ', '.join("{} {:.2f}/{:.2f}".format(name,
 			self[name].elapsedTime, self[name].duration) for name in self) + ']'
 
-class State(object):
+class State(object): # TODO: add start and end callbacks
 	"""Represents a game state
 
 A state can have finite or infinite duration (None value).
@@ -243,7 +267,7 @@ A status attribute describe whether the state is starting, ongoing or ending.
 If necessary, data can be stored for the purpose of state logic."""
 
 	def __init__(self, duration=None, data=None):
-		self.status = "starting" # One of "starting", "ongoing", "ending"
+		self.status = "starting"
 		self.duration = duration
 		self.elapsedTime = 0
 		self.data = data # Data conveyed by the state
