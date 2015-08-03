@@ -47,7 +47,7 @@ def test2():
 		lastStep = grid.fallStep()
 		print('fallStep', lastStep, '\n' + str(grid))
 		print('score:', score)
-		sleep(.2)
+		input()#sleep(.2)
 		if not lastStep: continue
 
 		combos = grid.testComboAll()
@@ -62,7 +62,7 @@ def test2():
 			for pos in combosPos: # Remove combos
 				grid[pos] = 0
 			print('testComboAll:', combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
-			sleep(1)
+			input()#sleep(1)
 
 def test3():
 	_grid = rotateMatrix([
@@ -105,6 +105,95 @@ def test4():
 	grid.swap(*pos)
 	print(grid)
 
+def test5():
+	_grid = rotateMatrix([\
+	[0, 0, 2, 0, 0],
+	[0, 0, 3, 2, 2],
+	[0, 0, 3, 1, 1],
+	[3, 0, 3, 1, 1]])
+	"""
+	_grid = rotateMatrix([\
+	[0, 0, 2, 0, 0],
+	[0, 3, 0, 2, 2],
+	[0, 3, 1, 1, 1],
+	[3, 1, 3, 1, 1]])"""
+	grid = Grid(data=_grid, nbSymbols=5)
+	print(str(grid))
+	pos1 = (1, 3)
+
+	comboGroup1 = grid.testComboAll()
+	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
+	print('testCombo', comboGroup1, '\n' + str(comboPos1), len(comboPos1))
+
+	grid.swap(*pos1)
+	print('swap', pos1, '\n' + str(grid))
+	grid.fallInstant()
+	print('fallInstant\n' + str(grid))
+
+	comboGroup2 = grid.testComboAll()
+	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
+	print('testCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
+	print()
+	print(grid)
+	print()
+
+	comboGroup3 = updateComboGroupLazy(comboGroup1, comboGroup2)
+	comboPos3 = set(itertools.chain.from_iterable(comboGroup3))
+	print('updateCombo', comboGroup3, '\n' + str(comboPos3), len(comboPos3))
+
+	for pos in comboPos3: # Remove combos
+		grid[pos] = 0
+
+	print()
+	print(grid)
+
+def test6():
+	_grid = rotateMatrix([\
+	[4, 0, 2, 0, 0],
+	[5, 0, 3, 2, 2],
+	[6, 0, 3, 1, 1],
+	[3, 0, 3, 1, 1]])
+	grid = Grid(data=_grid, nbSymbols=5)
+	print(str(grid))
+
+	cg = grid.testComboAll()
+	print(cg)
+	cp = set(itertools.chain.from_iterable(cg))
+	print(cp)
+
+def test7():
+	_grid = rotateMatrix([\
+	[3, 0, 0, 2, 0],
+	[3, 0, 0, 4, 0],
+	[2, 3, 2, 2, 0],
+	[1, 1, 4, 2, 4]])
+	grid = Grid(data=_grid, nbSymbols=5)
+	print(str(grid))
+	pos1 = (1, 3)
+
+	comboGroup1 = grid.testComboAll()
+	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
+	print('testCombo', comboGroup1, '\n' + str(comboPos1), len(comboPos1))
+
+	grid.swap(*pos1)
+	print('swap', pos1, '\n' + str(grid))
+	grid.fallInstant()
+	print('fallInstant\n' + str(grid))
+
+	comboGroup2 = grid.testComboAll()
+	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
+	print('testCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
+	print()
+	print(grid)
+	print()
+
+	comboGroup3 = updateComboGroup(comboGroup1, comboGroup2)
+	comboPos3 = set(itertools.chain.from_iterable(comboGroup3))
+	print('updateCombo', comboGroup3, '\n' + str(comboPos3), len(comboPos3))
+
+	#for pos in comboPos3: # Remove combos
+	#	grid[pos] = 0
+
 if __name__ == '__main__':
 	#print("\033[104mkuro\033[00mmatsu")
-	test4()
+	test5()
