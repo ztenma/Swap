@@ -36,10 +36,10 @@ def ERROR(msg, *args): logger.error(timestamp() + " " + msg, *args)
 
 try:
 	from collections.abc import Sequence, MutableSequence
-	print("Imported from collections.abc")
+	print("INFO: Successfuly imported collections.abc")
 except ImportError:
 	from collections import Sequence, MutableSequence
-	print("Imported from collections")
+	print("INFO: Successfuly imported collections")
 
 RESET_COLOR = '\033[0m'
 FG_DCOLORS = ['\033[90m', '\033[91m', '\033[93m', '\033[94m', '\033[92m', '\033[95m', '\033[96m']
@@ -82,20 +82,15 @@ class Game(object):
 
 			if stateName == "AI_swap":
 				if self.state["AI_swap"].status == "starting":
-					#DEBUG("AI_swap/")
-					self.swapperPos = self.randomSwapChoice()#randrange(self.grid.width-1), randrange(self.grid.height-1)
+					self.swapperPos = self.randomSwapChoice()
 				elif self.state["AI_swap"].status == "ending":
-					#DEBUG("AI_swap\\")
 					self.grid.swap(*self.swapperPos)
 					if "fall" not in self.state:
 						self.state.transition("fall", .2)
 					self.state.transition("AI_swap", .5)
 
 			elif stateName == "fall":
-				#DEBUG("Falling %s", "{:.2f}/{:.2f}".format(\
-				#	self.state[stateName].elapsedTime, self.state[stateName].duration))
 				if self.state["fall"].status == "ending":
-					#DEBUG("fall\\")
 					isLastStep = self.grid.fallStep()
 					if isLastStep:
 						comboGroup = self.grid.testComboAll()
@@ -113,22 +108,13 @@ class Game(object):
 
 			elif stateName.startswith("combo#"):
 				if self.state[stateName].status == "ending":
-					#DEBUG("%s\\", stateName)
 					#DEBUG("Combos %s\n%s", stateName, self.state[stateName].data)
 					endComboGroup = self.grid.testComboAll()
 					startComboGroup = self.state[stateName].data
 
 					comboGroup = updateComboGroupMorph(startComboGroup, endComboGroup)
-					comboGroupPos = set(itertools.chain.from_iterable(comboGroup))
+					self.processCombos(comboGroup)
 
-					for combo in comboGroup:
-						self.score += scoreIt(len(combo)) * self.scoreMultiplier
-					self.scoreMultiplier += 1
-					#DEBUG("Score multiplier %s", self.scoreMultiplier)
-
-					for pos in comboGroupPos: # Remove combos
-						self.grid[pos] = 0
-					#self.processCombos(self.state[stateName].data)
 					if "fall" not in self.state:
 						self.state.transition("fall", .2)
 					self.state.delete(stateName)
@@ -180,7 +166,7 @@ def updateComboGroupLazy(comboGroup1, comboGroup2):
 			comboGroup3.append(combo2)
 	return comboGroup3
 
-def updateComboGroupMorph(comboGroup1, comboGroup2): # TODO: extensive tests
+def updateComboGroupMorph(comboGroup1, comboGroup2): # TODO: pas ok
 	"""Computes the final combo group based on combo state start and end, using
 	the morph startegy.
 
@@ -321,6 +307,11 @@ class Grid(object):
 		else: return '\n'.join(' '.join(str(self._grid[i][j])\
 			for i in range(self.width)) + ' ' for j in range(self.height)) + '\n'
 
+	def reprBlocks(self):
+		"""Return a string represeting grid, with colors blocks"""
+		return (RESET_COLOR + '\n').join(''.join(bgcolors(self._grid[i][j]) + '  '\
+		for i in range(self.width)) for j in range(self.height)) + (RESET_COLOR + '\n')
+
 	def generate(self):
 		"""Generate a valid grid"""
 		for x in range(self.width):
@@ -339,28 +330,40 @@ class Grid(object):
 		"""Swap two blocks horizontally"""
 		self[x][y], self[x+1][y] = self[x+1][y], self[x][y]
 
+	def fallStepPos(self, x, y):
+		"""Make blocks above pos fall one step"""
+		for j in reversed(range(y)):
+			self[x][j+1] = self[x][j]
+		self[x][j] = 0
+
 	def fallInstant(self, focusX=None):
-		"""Make blocks fall instantly"""
-		for x in ((focusX, focusX+1) if focusX != None else range(self.width)):
+		"""Make blocks fall instantly."""
+		for x in (focusX if focusX != None else range(self.width)):
 			for y in reversed(range(self.height)):
-				while self[x][y] == 0 and any(self[x][j] != 0 for j in range(y)):
-					for j in reversed(range(y)):
-						self[x][j+1] = self[x][j]
-					self[x][j] = 0
+				while self[x][y] == 0 and any(self[x][j] != 0 for j in range(y)): # If hole
+					self.fallStepPos(x, y)
 
 	def fallStep(self, focusX=None):
 		"""Make blocks fall one step, return whether it was the last step of fall"""
 		isLastStep = True
-		for x in ((focusX, focusX+1) if focusX != None else range(self.width)):
+		for x in (focusX if focusX != None else range(self.width)):
 			for y in reversed(range(self.height)):
-				if self[x][y] == 0 and any(self[x][j] != 0 for j in range(y)):
-					for j in reversed(range(y)):
-						self[x][j+1] = self[x][j]
-					self[x][j] = 0
+				if self[x][y] == 0 and any(self[x][j] != 0 for j in range(y)): # If hole
+					self.fallStepPos(x, y)
 					if any(self[x][j] != 0 for j in range(y)):
 						isLastStep = False
 					break
 		return isLastStep
+
+	def getHolesLower(self):
+		holes = []
+		for x in range(self.width):
+			for y in reversed(range(self.height)):
+				if self[x][y] == 0:
+					if any(self[x][j] != 0 for j in range(y)): # If hole
+						holes.append((x, y))
+					break # Break at lower hole in column
+		return holes
 
 	def testComboLine(self, y):
 		"""Look for combos in line and return them"""
@@ -406,20 +409,9 @@ class Grid(object):
 				comboGroup.append(combo)
 		return comboGroup
 
-	def testComboSwap(self, x, y):
-		"""Test existance of combos at the designated swap position
-Return set of positions of blocks combinated"""
-		comboGroup = []
-
-		comboGroup.extend(self.testComboLine(y))
-		comboGroup.extend(self.testComboColumn(x))
-		comboGroup.extend(self.testComboColumn(x+1))
-
-		return comboGroup
-
 	def testComboAll(self):
 		"""Test existance of combos in the whole grid
-Return set of positions of blocks combinated"""
+Return the list of combos found"""
 		comboGroup = []
 
 		for x in range(self.width):
@@ -427,6 +419,77 @@ Return set of positions of blocks combinated"""
 
 		for y in range(self.height):
 			comboGroup.extend(self.testComboLine(y))
+
+		return comboGroup
+
+	def testComboLineAround(self, pos):
+		"""Look for combo around pos in line and return them"""
+		comboCount = 1
+		x, y = pos
+		i = x-1
+		ref = self[x][y]
+		if ref == 0: return None
+
+		# Looking left then right
+		while i >= 0 and self[i][y] == ref:
+			comboCount += 1
+			i -= 1
+		comboPos = i+1
+		i = x+1
+		while i < self.width and self[i][y] == ref:
+			comboCount += 1
+			i += 1
+
+		if comboCount >= 3:
+			return Combo([(i, y) for i in range(comboPos, comboPos+comboCount)], ref)
+		else: return None
+
+	def testComboColumnAround(self, pos):
+		"""Look for combo around pos in column and return them"""
+		comboCount = 1
+		x, y = pos
+		j = y-1
+		ref = self[x][y]
+		if ref == 0: return None
+
+		while j >= 0 and self[x][j] == ref:
+			comboCount += 1
+			j -= 1
+		comboPos = j+1
+		j = y+1
+		while j < self.height and self[x][j] == ref:
+			comboCount += 1
+			j += 1
+
+		if comboCount >= 3:
+			return Combo([(x, j) for j in range(comboPos, comboPos+comboCount)], ref)
+		else: return None
+
+	def testComboSwap(self, x, y):
+		"""Test existance of combos at the designated swap position
+Return the group of combos found"""
+		comboGroup = []
+
+		comboGroup.extend(self.testComboLineAround(y))
+		comboGroup.extend(self.testComboColumnAround(x))
+		comboGroup.extend(self.testComboColumnAround(x+1))
+
+		return comboGroup
+
+	def testComboAfterFall(self, formerHole):
+		"""Test existance of combos above a former hole
+Return the list of combos found"""
+		comboGroup = []
+		targetYGroup = []
+		x, y = _, j = formerHole
+
+		# Get the group of blocks that just fell
+		while j >= 0 and self._grid[x][j] > 0:
+			combo = self.testComboLineAround((x, j))
+			if combo: comboGroup.append(combo)
+			j -= 1
+		combo = self.testComboColumnAround((x, y))
+		if combo: comboGroup.append(combo)
 
 		return comboGroup
 
@@ -486,7 +549,7 @@ class Combo(MutableSequence):
 
 	def __eq__(self, other): return self.blockList == other.blockList and self.color == other.color
 	def __repr__(self):
-		return "Combo({}, ".format(self.color) + repr(self.blockList) + ')'
+		return "Combo({}, ".format(self.color) + ', '.join(str(b) for b in self.blockList) + ')'
 
 if __name__ == '__main__':
 	pass

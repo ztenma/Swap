@@ -110,18 +110,18 @@ class TUI(object):
 			for x in range(grid.width):
 				color, chars = TUI.COLORS[grid[x][y]][0], '  '
 
-				spx, spy = self.game.swapperPos
-				if spy == y and spx == x:
-					chars = '>>'
-				elif spy == y and spx+1 == x:
-					chars = '<<'
-
 				comboGroups = self.game.getComboGroups()
 				for cg in comboGroups:
 					cgp = set(itertools.chain.from_iterable(cg))
 					for block in cgp:
 						if block.pos == (x, y):
 							chars = "**"
+
+				spx, spy = self.game.swapperPos
+				if spy == y and spx == x:
+					chars = '>>'
+				elif spy == y and spx+1 == x:
+					chars = '<<'
 
 				out.append((color, chars))
 			out.append('\n')

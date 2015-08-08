@@ -17,7 +17,7 @@ def test1():
 	[3, 2, 0, 2, 0, 3],
 	[1, 1, 0, 2, 4, 3]])
 	grid = Grid(data=_grid, nbSymbols=5)
-	print('init\n' + str(grid))
+	print(grid.reprBlocks())
 	pos = (2, 1)
 
 	grid.fallInstant()
@@ -31,15 +31,17 @@ def test1():
 	combosPos = set(itertools.chain.from_iterable(combos))
 	for pos in combosPos: # Remove combos
 		grid[pos] = 0
-	print('testCombo {}:'.format(pos), combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
+	print('testCombo {}:'.format(pos), combos, '\n' + str(combosPos), len(combosPos))
+	print()
+	print(grid.reprBlocks())
 
 	grid.fallInstant()
-	print('fallInstant\n' + str(grid))
+	print('fallInstant\n' + grid.reprBlocks())
 
 def test2():
 	grid = Grid(data=[[randrange(4) for _ in range(20)] for _ in range(40)], nbSymbols=4)
 	#grid = Grid(40, 20, 4)
-	print('init\n' + str(grid))
+	print(grid.reprBlocks())
 
 	score, scoreMultiplier = 0, 1
 	combos = True
@@ -61,7 +63,9 @@ def test2():
 			scoreMultiplier += 1
 			for pos in combosPos: # Remove combos
 				grid[pos] = 0
-			print('testComboAll:', combos, '\n' + str(combosPos), len(combosPos), '\n' + str(grid))
+			print('testComboAll:', combos, '\n' + str(combosPos), len(combosPos))
+			print()
+			print(grid.reprBlocks())
 			input()#sleep(1)
 
 def test3():
@@ -88,8 +92,7 @@ def test3():
 [1,2,3,1,2,1,1,3,0,0,1,0,1,0,1,1,2,1,2,0,0,1,2,2,0,1,1,3,2,3,1,3,2,1,3,2,1,3,2,3]
 ])
 	grid = Grid(data=_grid, nbSymbols=4)
-	print('init\n' + str(grid))
-	return grid
+	print(grid.reprBlocks())
 
 def test4():
 	_grid = rotateMatrix(\
@@ -98,12 +101,12 @@ def test4():
 	[0, 0, 2, 2, 0, 3],
 	[1, 0, 0, 2, 4, 3]])
 	grid = Grid(data=_grid, nbSymbols=5)
-	print('init\n' + str(grid))
+	print(grid.reprBlocks())
 
 	pos = grid.getRandomSwap()
 	print(pos)
 	grid.swap(*pos)
-	print(grid)
+	print(grid.reprBlocks())
 
 def test5():
 	_grid = rotateMatrix([\
@@ -118,7 +121,7 @@ def test5():
 	[0, 3, 1, 1, 1],
 	[3, 1, 3, 1, 1]])"""
 	grid = Grid(data=_grid, nbSymbols=5)
-	print(str(grid))
+	print(grid.reprBlocks())
 	pos1 = (1, 3)
 
 	comboGroup1 = grid.testComboAll()
@@ -134,7 +137,7 @@ def test5():
 	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
 	print('testCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
 	print()
-	print(grid)
+	print(grid.reprBlocks())
 	print()
 
 	comboGroup3 = updateComboGroupMorph(comboGroup1, comboGroup2)
@@ -145,7 +148,7 @@ def test5():
 		grid[pos] = 0
 
 	print()
-	print(grid)
+	print(grid.reprBlocks())
 
 def test6():
 	_grid = rotateMatrix([\
@@ -154,7 +157,7 @@ def test6():
 	[6, 0, 3, 1, 1],
 	[3, 0, 3, 1, 1]])
 	grid = Grid(data=_grid, nbSymbols=5)
-	print(str(grid))
+	print(grid.reprBlocks())
 
 	cg = grid.testComboAll()
 	print(cg)
@@ -168,7 +171,7 @@ def test7():
 	[2, 3, 2, 2, 0],
 	[1, 1, 4, 2, 4]])
 	grid = Grid(data=_grid, nbSymbols=5)
-	print(str(grid))
+	print(grid.reprBlocks())
 	pos1 = (1, 3)
 
 	comboGroup1 = grid.testComboAll()
@@ -184,7 +187,7 @@ def test7():
 	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
 	print('testCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
 	print()
-	print(grid)
+	print(grid.reprBlocks())
 	print()
 
 	comboGroup3 = updateComboGroupMorph(comboGroup1, comboGroup2)
@@ -194,6 +197,77 @@ def test7():
 	#for pos in comboPos3: # Remove combos
 	#	grid[pos] = 0
 
+def test8():
+	_grid = rotateMatrix([\
+	[3, 0, 0, 4, 4, 0],
+	[0, 0, 0, 4, 0, 0],
+	[1, 0, 2, 3, 4, 2],
+	[0, 1, 1, 2, 2, 0]])
+	grid = Grid(data=_grid, nbSymbols=5)
+	print(grid.reprBlocks())
+
+	print("combos line 3:", grid.testComboLine(3))
+	print("combos column 3:", grid.testComboColumn(3))
+	print("combo line around (1, 3):", grid.testComboLineAround((1, 3)))
+	print("combo column around (3, 2):", grid.testComboColumnAround((3, 2)))
+	print("holes:", grid.getHolesLower())
+
+	isLastStep = grid.fallStep()
+	grid.swap(3, 2)
+	print(grid.reprBlocks())
+	print("combos line 3:", grid.testComboLine(3))
+	print("combos column 3:", grid.testComboColumn(3))
+	print("combo line around (1, 3):", grid.testComboLineAround((1, 3)))
+	print("combo column around (3, 2):", grid.testComboColumnAround((3, 2)))
+	print("holes:", grid.getHolesLower())
+
+	isLastStep = grid.fallStep()
+	print(grid.reprBlocks())
+	print("combos all:", grid.testComboAll())
+	print("holes:", grid.getHolesLower())
+
+	combo = grid.testComboLineAround((1, 3))
+	print("combo line around (1, 3):", combo)
+	for pos in combo: # Remove combos
+		grid[pos] = 0
+	print(grid.reprBlocks())
+	print("combo line around (1, 3):", grid.testComboLineAround((1, 3)))
+	print("combo column around (3, 2):", grid.testComboColumnAround((3, 2)))
+	print("holes:", grid.getHolesLower())
+
+	isLastStep = grid.fallStep()
+	print(grid.reprBlocks())
+	print("combos all:", grid.testComboAll())
+	print("combo line around (3, 3):", grid.testComboLineAround((3, 3)))
+	print("combo column around (3, 3):", grid.testComboColumnAround((3, 3)))
+	print("holes:", grid.getHolesLower())
+
+def test9():
+	_grid = rotateMatrix([\
+	[1, 0, 0, 0, 4],
+	[0, 0, 0, 0, 4],
+	[1, 0, 4, 4, 4],
+	[1, 0, 2, 2, 0]])
+	grid = Grid(data=_grid, nbSymbols=5)
+
+	holes1 = grid.getHolesLower()
+	print(grid.reprBlocks())
+	print("holes:", holes1)
+
+	isLastStep = grid.fallStep()
+	holes2 = grid.getHolesLower()
+	print(grid.reprBlocks())
+	print("holes:", holes2)
+
+	if not holes2:
+		for hole in holes1:
+			comboGroup = grid.testComboAfterFall(hole)
+			print("Combos after fall {}:".format(hole), comboGroup)
+			for pos in set(itertools.chain.from_iterable(comboGroup)): # Remove combos
+				grid[pos] = 0
+			print(grid.reprBlocks())
+
+
 if __name__ == '__main__':
 	#print("\033[104mkuro\033[00mmatsu")
-	test5()
+	test9()
