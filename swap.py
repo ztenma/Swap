@@ -36,10 +36,10 @@ def ERROR(msg, *args): logger.error(timestamp() + " " + msg, *args)
 
 try:
 	from collections.abc import Sequence, MutableSequence
-	print("Imported collections.abc")
+	print("Imported from collections.abc")
 except ImportError:
 	from collections import Sequence, MutableSequence
-	print("Imported collections")
+	print("Imported from collections")
 
 RESET_COLOR = '\033[0m'
 FG_DCOLORS = ['\033[90m', '\033[91m', '\033[93m', '\033[94m', '\033[92m', '\033[95m', '\033[96m']
@@ -48,8 +48,8 @@ BG_LCOLORS = ['\033[40m', '\033[101m', '\033[103m', '\033[104m', '\033[102m', '\
 BG_DCOLORS = ['\033[40m', '\033[41m', '\033[43m', '\033[44m', '\033[42m', '\033[45m', '\033[46m', '\033[47m']
 fgcolors = lambda i: FG_DCOLORS[i] if i < 7 else '\033[97m'
 bgcolors = lambda i: BG_DCOLORS[i] if i < 7 else '\033[97m'
-SCORES = [2, 5, 20, 80, 200, 500, 1000, 2000, 4000, 6000, 8000, 10000]
-scoreIt = lambda x: SCORES[x-3] if x <= 10 else 0
+SCORES = [2, 5, 20, 80, 200, 500, 1000, 2000, 4000, 6000, 8000]
+scoreIt = lambda x: SCORES[x-3] if x <= 10 else 10000
 
 class Game(object):
 
@@ -57,7 +57,7 @@ class Game(object):
 		self.grid = Grid(15, 20, 4)
 
 		self.state = StateMachine()
-		#self.state.transition("IA_swap", 2)
+		self.state.transition("AI_swap", 2) # To enable AI
 		self.lastTime = time()
 		self.pause = False
 
@@ -76,20 +76,20 @@ class Game(object):
 
 		if self.pause: return
 
-		DEBUG("State %s", self.state.crepr())
+		#DEBUG("State %s", self.state.crepr())
 
 		for stateName in tuple(self.state.keys()):
 
-			if stateName == "IA_swap":
-				if self.state["IA_swap"].status == "starting":
-					#DEBUG("IA_swap/")
+			if stateName == "AI_swap":
+				if self.state["AI_swap"].status == "starting":
+					#DEBUG("AI_swap/")
 					self.swapperPos = self.randomSwapChoice()#randrange(self.grid.width-1), randrange(self.grid.height-1)
-				elif self.state["IA_swap"].status == "ending":
-					#DEBUG("IA_swap\\")
+				elif self.state["AI_swap"].status == "ending":
+					#DEBUG("AI_swap\\")
 					self.grid.swap(*self.swapperPos)
 					if "fall" not in self.state:
 						self.state.transition("fall", .2)
-					self.state.transition("IA_swap", 2)
+					self.state.transition("AI_swap", .5)
 
 			elif stateName == "fall":
 				#DEBUG("Falling %s", "{:.2f}/{:.2f}".format(\
@@ -100,11 +100,11 @@ class Game(object):
 					if isLastStep:
 						comboGroup = self.grid.testComboAll()
 						if comboGroup:
-							comboNb = sum(1 for name in self.state if name.startswith("combo#"))
-							comboGroups = list(self.state[name].data for name in self.state if name.startswith("combo#"))
+							comboGroups = self.getComboGroups()
+							comboNb = len(comboGroups)
 							#DEBUG("Combo groups %s in %s", comboGroup, comboGroups)
 							if not comboGroup in comboGroups:
-								self.state.transition("combo#" + str(comboNb), 1, comboGroup)
+								self.state.transition("combo#" + str(comboNb), 1.6, comboGroup)
 						else:
 							self.scoreMultiplier = 1
 						self.state.delete("fall")
@@ -118,7 +118,7 @@ class Game(object):
 					endComboGroup = self.grid.testComboAll()
 					startComboGroup = self.state[stateName].data
 
-					comboGroup = updateComboGroupLazy(startComboGroup, endComboGroup)
+					comboGroup = updateComboGroupMorph(startComboGroup, endComboGroup)
 					comboGroupPos = set(itertools.chain.from_iterable(comboGroup))
 
 					for combo in comboGroup:
@@ -134,6 +134,9 @@ class Game(object):
 					self.state.delete(stateName)
 
 		self.state.update(dt)
+
+	def getComboGroups(self):
+		return [self.state[name].data for name in self.state if name.startswith("combo#")]
 
 	def processCombos(self, comboGroup):
 		for combo in comboGroup:
@@ -158,6 +161,10 @@ class Game(object):
 	def swap(self):
 		self.grid.swap(*self.swapperPos)
 		self.state.transition("fall", .2)
+
+	def processInput(self, name):
+		if name == "swap": self.swap()
+		elif name in ("up", "right", "down", "left"): self.moveSwapper(name)
 
 def updateComboGroupLazy(comboGroup1, comboGroup2):
 	"""Computes the final combo group based on combo state start and end, using
@@ -186,14 +193,15 @@ def updateComboGroupMorph(comboGroup1, comboGroup2): # TODO: extensive tests
 	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
 	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
 	diffPos = comboPos1.intersection(comboPos2)
-	DEBUG("cp: %s %s", comboPos1, comboPos2)
-	DEBUG("diffPos: %s", diffPos)
+	#DEBUG("cp: %s %s", comboPos1, comboPos2)
+	#DEBUG("diff pos: %s", diffPos)
 	comboGroup3 = []
 
 	for combo2 in comboGroup2:
 		for pos in diffPos:
 			if pos in combo2:
 				comboGroup3.append(combo2)
+	DEBUG("morph combo group: %s", comboGroup3)
 	return comboGroup3
 
 class StateMachine(dict):
@@ -237,7 +245,7 @@ class StateMachine(dict):
 
 	def _shortenName(self, stateName):
 		try:
-			return {'debug': 'D ', 'swap': 'S ', 'IA_swap': 's ', 'fall': 'F ', 'combo': 'C '}[stateName.split('#')[0]]
+			return {'debug': 'D ', 'swap': 'S ', 'AI_swap': 's ', 'fall': 'F ', 'combo': 'C '}[stateName.split('#')[0]]
 		except KeyError:
 			raise KeyError("state name not registered")
 
@@ -302,10 +310,9 @@ class Grid(object):
 		self._grid[pos[0]][pos[1]] = val
 
 	def __repr__(self):
-		return self.reprBlocks()
-		#return '\n'.join(' '.join(map(str, (self._grid[i][j] for i in range(self.width)))) for j in range(self.height)) + '\n'
+		return self.reprDigits()
 
-	def reprDigits(self, color=True):
+	def reprDigits(self, color=False):
 		"""Return a string represeting grid, with digits and colors"""
 		if color:
 			return (RESET_COLOR + '\n').join(' '.join(fgcolors(self._grid[i][j]) + \
@@ -313,11 +320,6 @@ class Grid(object):
 			for j in range(self.height)) + (RESET_COLOR + '\n')
 		else: return '\n'.join(' '.join(str(self._grid[i][j])\
 			for i in range(self.width)) + ' ' for j in range(self.height)) + '\n'
-
-	def reprBlocks(self):
-		"""Return a string represeting grid, with colors blocks"""
-		return (RESET_COLOR + '\n').join(''.join(bgcolors(self._grid[i][j]) + '  '\
-		for i in range(self.width)) for j in range(self.height)) + (RESET_COLOR + '\n')
 
 	def generate(self):
 		"""Generate a valid grid"""

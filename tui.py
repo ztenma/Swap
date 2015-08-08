@@ -2,6 +2,7 @@
 
 """Textual User Interface for Swap"""
 
+import sys
 from random import randrange
 import itertools
 import urwid
@@ -13,6 +14,7 @@ class TUI(object):
 	('g', 'dark green'), ('m', 'dark magenta'), ('c', 'dark cyan'), ('z', 'light gray')]
 
 	def __init__(self):
+		self.DT = .04
 		self.game = swap.Game()
 
 		self.buildUI()
@@ -63,14 +65,18 @@ class TUI(object):
 		self.palette = palette
 		self.frame = frame
 		self.mainLoop = urwid.MainLoop(frame, palette, unhandled_input=self.handleInput)
+		self.mainLoop.screen.set_input_timeouts(None, None)
+		#print(dir(self.mainLoop.screen))
+		#sys.exit()
 
 	def handleInput(self, key):
+		#DEBUG("input %s", self.mainLoop.screen.get_input())
 		if key == ' ':
 			self.game.pause = not self.game.pause
 		elif key in ('up', 'right', 'down', 'left'):
-			self.game.moveSwapper(key)
+			self.game.processInput(key)
 		elif key == "x":
-			self.game.swap()
+			self.game.processInput("swap")
 		elif key == '+':
 			self.scoreLabel.base_widget.set_text("test")
 		elif key in ('q', 'Q'):
@@ -91,7 +97,7 @@ class TUI(object):
 		self.game.update()
 		if not self.game.pause:
 			self.updateUI()
-		self.mainLoop.set_alarm_in(.05, self.update)
+		self.mainLoop.set_alarm_in(self.DT, self.update)
 
 	def updateDebugUI(self, loop, userData):
 		self.stateLabel.set_text(self.game.state.vcrepr())
@@ -109,6 +115,13 @@ class TUI(object):
 					chars = '>>'
 				elif spy == y and spx+1 == x:
 					chars = '<<'
+
+				comboGroups = self.game.getComboGroups()
+				for cg in comboGroups:
+					cgp = set(itertools.chain.from_iterable(cg))
+					for block in cgp:
+						if block.pos == (x, y):
+							chars = "**"
 
 				out.append((color, chars))
 			out.append('\n')

@@ -137,7 +137,7 @@ def test5():
 	print(grid)
 	print()
 
-	comboGroup3 = updateComboGroupLazy(comboGroup1, comboGroup2)
+	comboGroup3 = updateComboGroupMorph(comboGroup1, comboGroup2)
 	comboPos3 = set(itertools.chain.from_iterable(comboGroup3))
 	print('updateCombo', comboGroup3, '\n' + str(comboPos3), len(comboPos3))
 
@@ -187,7 +187,7 @@ def test7():
 	print(grid)
 	print()
 
-	comboGroup3 = updateComboGroup(comboGroup1, comboGroup2)
+	comboGroup3 = updateComboGroupMorph(comboGroup1, comboGroup2)
 	comboPos3 = set(itertools.chain.from_iterable(comboGroup3))
 	print('updateCombo', comboGroup3, '\n' + str(comboPos3), len(comboPos3))
 
