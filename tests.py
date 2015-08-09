@@ -27,11 +27,11 @@ def test1():
 	grid.fallInstant(pos[0])
 	print('fallInstant\n' + str(grid))
 
-	combos = grid.testComboAll()
+	combos = grid.getComboAll()
 	combosPos = set(itertools.chain.from_iterable(combos))
 	for pos in combosPos: # Remove combos
 		grid[pos] = 0
-	print('testCombo {}:'.format(pos), combos, '\n' + str(combosPos), len(combosPos))
+	print('getCombo {}:'.format(pos), combos, '\n' + str(combosPos), len(combosPos))
 	print()
 	print(grid.reprBlocks())
 
@@ -52,7 +52,7 @@ def test2():
 		input()#sleep(.2)
 		if not lastStep: continue
 
-		combos = grid.testComboAll()
+		combos = grid.getComboAll()
 		combosPos = set(itertools.chain.from_iterable(combos))
 		#print(combos, combosPos)
 		if combos:
@@ -63,7 +63,7 @@ def test2():
 			scoreMultiplier += 1
 			for pos in combosPos: # Remove combos
 				grid[pos] = 0
-			print('testComboAll:', combos, '\n' + str(combosPos), len(combosPos))
+			print('getComboAll:', combos, '\n' + str(combosPos), len(combosPos))
 			print()
 			print(grid.reprBlocks())
 			input()#sleep(1)
@@ -124,18 +124,18 @@ def test5():
 	print(grid.reprBlocks())
 	pos1 = (1, 3)
 
-	comboGroup1 = grid.testComboAll()
+	comboGroup1 = grid.getComboAll()
 	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
-	print('testCombo', comboGroup1, '\n' + str(comboPos1), len(comboPos1))
+	print('getCombo', comboGroup1, '\n' + str(comboPos1), len(comboPos1))
 
 	grid.swap(*pos1)
 	print('swap', pos1, '\n' + str(grid))
 	grid.fallInstant()
 	print('fallInstant\n' + str(grid))
 
-	comboGroup2 = grid.testComboAll()
+	comboGroup2 = grid.getComboAll()
 	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
-	print('testCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
+	print('getCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
 	print()
 	print(grid.reprBlocks())
 	print()
@@ -159,7 +159,7 @@ def test6():
 	grid = Grid(data=_grid, nbSymbols=5)
 	print(grid.reprBlocks())
 
-	cg = grid.testComboAll()
+	cg = grid.getComboAll()
 	print(cg)
 	cp = set(itertools.chain.from_iterable(cg))
 	print(cp)
@@ -174,18 +174,18 @@ def test7():
 	print(grid.reprBlocks())
 	pos1 = (1, 3)
 
-	comboGroup1 = grid.testComboAll()
+	comboGroup1 = grid.getComboAll()
 	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
-	print('testCombo', comboGroup1, '\n' + str(comboPos1), len(comboPos1))
+	print('getCombo', comboGroup1, '\n' + str(comboPos1), len(comboPos1))
 
 	grid.swap(*pos1)
 	print('swap', pos1, '\n' + str(grid))
 	grid.fallInstant()
 	print('fallInstant\n' + str(grid))
 
-	comboGroup2 = grid.testComboAll()
+	comboGroup2 = grid.getComboAll()
 	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
-	print('testCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
+	print('getCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
 	print()
 	print(grid.reprBlocks())
 	print()
@@ -206,41 +206,41 @@ def test8():
 	grid = Grid(data=_grid, nbSymbols=5)
 	print(grid.reprBlocks())
 
-	print("combos line 3:", grid.testComboLine(3))
-	print("combos column 3:", grid.testComboColumn(3))
-	print("combo line around (1, 3):", grid.testComboLineAround((1, 3)))
-	print("combo column around (3, 2):", grid.testComboColumnAround((3, 2)))
-	print("holes:", grid.getHolesLower())
+	print("combos line 3:", grid.getComboLine(3))
+	print("combos column 3:", grid.getComboColumn(3))
+	print("combo line around (1, 3):", grid.getComboLineAround((1, 3)))
+	print("combo column around (3, 2):", grid.getComboColumnAround((3, 2)))
+	print("holes:", grid.getLowerHoles())
 
 	isLastStep = grid.fallStep()
 	grid.swap(3, 2)
 	print(grid.reprBlocks())
-	print("combos line 3:", grid.testComboLine(3))
-	print("combos column 3:", grid.testComboColumn(3))
-	print("combo line around (1, 3):", grid.testComboLineAround((1, 3)))
-	print("combo column around (3, 2):", grid.testComboColumnAround((3, 2)))
-	print("holes:", grid.getHolesLower())
+	print("combos line 3:", grid.getComboLine(3))
+	print("combos column 3:", grid.getComboColumn(3))
+	print("combo line around (1, 3):", grid.getComboLineAround((1, 3)))
+	print("combo column around (3, 2):", grid.getComboColumnAround((3, 2)))
+	print("holes:", grid.getLowerHoles())
 
 	isLastStep = grid.fallStep()
 	print(grid.reprBlocks())
-	print("combos all:", grid.testComboAll())
-	print("holes:", grid.getHolesLower())
+	print("combos all:", grid.getComboAll())
+	print("holes:", grid.getLowerHoles())
 
-	combo = grid.testComboLineAround((1, 3))
+	combo = grid.getComboLineAround((1, 3))
 	print("combo line around (1, 3):", combo)
 	for pos in combo: # Remove combos
 		grid[pos] = 0
 	print(grid.reprBlocks())
-	print("combo line around (1, 3):", grid.testComboLineAround((1, 3)))
-	print("combo column around (3, 2):", grid.testComboColumnAround((3, 2)))
-	print("holes:", grid.getHolesLower())
+	print("combo line around (1, 3):", grid.getComboLineAround((1, 3)))
+	print("combo column around (3, 2):", grid.getComboColumnAround((3, 2)))
+	print("holes:", grid.getLowerHoles())
 
 	isLastStep = grid.fallStep()
 	print(grid.reprBlocks())
-	print("combos all:", grid.testComboAll())
-	print("combo line around (3, 3):", grid.testComboLineAround((3, 3)))
-	print("combo column around (3, 3):", grid.testComboColumnAround((3, 3)))
-	print("holes:", grid.getHolesLower())
+	print("combos all:", grid.getComboAll())
+	print("combo line around (3, 3):", grid.getComboLineAround((3, 3)))
+	print("combo column around (3, 3):", grid.getComboColumnAround((3, 3)))
+	print("holes:", grid.getLowerHoles())
 
 def test9():
 	_grid = rotateMatrix([\
@@ -250,18 +250,18 @@ def test9():
 	[1, 0, 2, 2, 0]])
 	grid = Grid(data=_grid, nbSymbols=5)
 
-	holes1 = grid.getHolesLower()
+	holes1 = grid.getLowerHoles()
 	print(grid.reprBlocks())
 	print("holes:", holes1)
 
 	isLastStep = grid.fallStep()
-	holes2 = grid.getHolesLower()
+	holes2 = grid.getLowerHoles()
 	print(grid.reprBlocks())
 	print("holes:", holes2)
 
 	if not holes2:
 		for hole in holes1:
-			comboGroup = grid.testComboAfterFall(hole)
+			comboGroup = grid.getComboAfterFall(hole)
 			print("Combos after fall {}:".format(hole), comboGroup)
 			for pos in set(itertools.chain.from_iterable(comboGroup)): # Remove combos
 				grid[pos] = 0

@@ -65,9 +65,6 @@ class TUI(object):
 		self.palette = palette
 		self.frame = frame
 		self.mainLoop = urwid.MainLoop(frame, palette, unhandled_input=self.handleInput)
-		self.mainLoop.screen.set_input_timeouts(None, None)
-		#print(dir(self.mainLoop.screen))
-		#sys.exit()
 
 	def handleInput(self, key):
 		#DEBUG("input %s", self.mainLoop.screen.get_input())
