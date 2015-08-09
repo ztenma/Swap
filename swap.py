@@ -52,7 +52,7 @@ class Game(object):
 
 		INFO("Starting Swap")
 
-	def update(self):
+	"""def update(self):
 
 		currentTime = time()
 		dt = currentTime - self.lastTime
@@ -103,6 +103,51 @@ class Game(object):
 						self.state.transition("fall", .2)
 					self.state.delete(stateName)
 
+		self.state.update(dt)"""
+
+	def update(self):
+
+		currentTime = time()
+		dt = currentTime - self.lastTime
+		self.lastTime = currentTime
+
+		if self.pause: return
+
+		#DEBUG("State %s", self.state.crepr())
+
+		for stateName in tuple(self.state.keys()):
+
+			if stateName == "AI_swap":
+				if self.state["AI_swap"].status == "starting":
+					self.swapperPos = self.randomSwapChoice()
+				elif self.state["AI_swap"].status == "ending":
+					self.swap()
+					self.state.transition("AI_swap", .5)
+
+			elif stateName.startswith("fall#"):
+				if self.state[stateName].status == "ending":
+					pos = self.state[stateName].data
+					self.grid.fallStepPos(pos)
+					if self.grid.isHole(*pos):
+						self.state.transition(stateName, .1)
+					else: # Falling ended
+						self.checkCombo(pos)
+						if sum(1 for name in self.state if name.startswith("fall#")) == 0:
+							self.scoreMultiplier = 1
+						self.state.delete(stateName)
+
+			elif stateName.startswith("combo#"):
+				if self.state[stateName].status == "ending":
+					#DEBUG("Combos %s\n%s", stateName, self.state[stateName].data)
+					endComboGroup = self.grid.getComboAll()
+					startComboGroup = self.state[stateName].data
+
+					comboGroup = updateComboGroupMorph(startComboGroup, endComboGroup)
+					self.processCombos(comboGroup)
+
+					self.checkFall()
+					self.state.delete(stateName)
+
 		self.state.update(dt)
 
 	def checkFall(self, focusX=None): # TODO then rewrite update()
@@ -120,6 +165,18 @@ class Game(object):
 
 	def getComboGroups(self):
 		return [self.state[name].data for name in self.state if name.startswith("combo#")]
+
+	def checkCombo(self, pos):
+		"""Check whether there are combo above pos. Return combo group.
+
+		Creates combo state."""
+		comboGroup = self.grid.getComboAfterFall(pos)
+		if comboGroup:
+			comboGroups = self.getComboGroups()
+			#DEBUG("Combo groups %s in %s", comboGroup, comboGroups)
+			if comboGroup not in comboGroups:
+				self.state.transition("combo#" + str(len(comboGroups)), 1.6, comboGroup)
+		return comboGroup
 
 	def processCombos(self, comboGroup):
 		for combo in comboGroup:
@@ -142,8 +199,9 @@ class Game(object):
 		else: raise ValueError("direction must be one of up, right, down, left")
 
 	def swap(self):
-		self.grid.swap(*self.swapperPos)
-		self.state.transition("fall", .2)
+		x, y = self.swapperPos
+		self.grid.swap(x, y)
+		self.checkFall([x, x+1])
 
 	def processInput(self, name):
 		if name == "swap": self.swap()
@@ -228,7 +286,7 @@ class StateMachine(dict):
 
 	def _shortenName(self, stateName):
 		try:
-			return {'debug': 'D ', 'swap': 'S ', 'AI_swap': 's ', 'fall': 'F ', 'combo': 'C '}[stateName.split('#')[0]]
+			return {'debug': 'D ', 'swap': 's ', 'AI_swap': 'S ', 'fall': 'F ', 'combo': 'C '}[stateName.split('#')[0]]
 		except KeyError:
 			raise KeyError("state name not registered")
 
