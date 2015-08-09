@@ -7,7 +7,7 @@ from random import randrange
 import itertools
 import urwid
 import swap
-from swap import INFO, DEBUG, WARN, ERROR
+from log import *
 
 class TUI(object):
 	COLORS = [('k', 'black'), ('r', 'dark red'), ('w', 'brown'), ('b', 'dark blue'),
