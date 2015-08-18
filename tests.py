@@ -5,6 +5,8 @@
 Tests for Swap
 """
 
+from time import time, sleep
+
 from swap import *
 
 def rotateMatrix(mat):

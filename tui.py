@@ -6,6 +6,7 @@ import sys
 from random import randrange
 import itertools
 import urwid
+
 import swap
 from log import *
 
@@ -105,22 +106,22 @@ class TUI(object):
 		color, chars = None, None
 		for y in range(grid.height):
 			for x in range(grid.width):
-				color, chars = TUI.COLORS[grid[x][y]][0], '  '
+				color, chars = TUI.COLORS[grid[x][y]][0], [' ', ' ']
 
 				comboGroups = self.game.getComboGroups()
 				for cg in comboGroups:
 					cgp = set(itertools.chain.from_iterable(cg))
 					for block in cgp:
 						if block.pos == (x, y):
-							chars = "**"
+							chars = ['*', '*']
 
 				spx, spy = self.game.swapperPos
 				if spy == y and spx == x:
-					chars = '>>'
+					chars[0] = '['
 				elif spy == y and spx+1 == x:
-					chars = '<<'
+					chars[1] = ']'
 
-				out.append((color, chars))
+				out.append((color, ''.join(chars)))
 			out.append('\n')
 		#out = [[(TUI.COLORS[grid[i][j]][0], '  ')\
 		#for i in range(grid.width)] + ['\n'] for j in range(grid.height)]

@@ -18,22 +18,16 @@ Battle vs CPU/Human
 
 import sys
 from random import randrange
-from time import time, sleep, strftime
+from time import time
 import itertools
 
 from log import *
-
-try:
-	from collections.abc import Sequence, MutableSequence
-	print("INFO: Successfuly imported collections.abc")
-except ImportError:
-	from collections import Sequence, MutableSequence
-	print("INFO: Successfuly imported collections")
-
 from grid import Grid, Combo, Block
 
 SCORES = [2, 5, 20, 80, 200, 500, 1000, 2000, 4000, 6000, 8000]
 scoreIt = lambda x: SCORES[x-3] if x <= 10 else 10000
+
+STATES = {'debug': 'D', 'swap': 's', 'AI_swap': 'S', 'fall': 'F', 'combo': 'C'}
 
 class Game(object):
 
@@ -105,7 +99,7 @@ class Game(object):
 
 		self.state.update(dt)"""
 
-	def update(self):
+	def update(self): # TODO problème de synchro fall/combo
 
 		currentTime = time()
 		dt = currentTime - self.lastTime
@@ -113,7 +107,8 @@ class Game(object):
 
 		if self.pause: return
 
-		#DEBUG("State %s", self.state.crepr())
+		if any(self.state.isChanging(e) for e in self.state):
+			DEBUG("State: %s", self.state.vcrepr())
 
 		for stateName in tuple(self.state.keys()):
 
@@ -122,19 +117,19 @@ class Game(object):
 					self.swapperPos = self.randomSwapChoice()
 				elif self.state["AI_swap"].status == "ending":
 					self.swap()
-					self.state.transition("AI_swap", .5)
+					self.state.transition("AI_swap", 1.5)
 
 			elif stateName.startswith("fall#"):
 				if self.state[stateName].status == "ending":
 					pos = self.state[stateName].data
-					self.grid.fallStepPos(pos)
+					self.grid.fallStepPos(*pos)
 					if self.grid.isHole(*pos):
-						self.state.transition(stateName, .1)
+						self.state.transition(stateName, .2, pos)
 					else: # Falling ended
-						self.checkCombo(pos)
 						if sum(1 for name in self.state if name.startswith("fall#")) == 0:
 							self.scoreMultiplier = 1
 						self.state.delete(stateName)
+						self.checkCombo(self.grid.getComboAfterFall(pos))
 
 			elif stateName.startswith("combo#"):
 				if self.state[stateName].status == "ending":
@@ -142,11 +137,11 @@ class Game(object):
 					endComboGroup = self.grid.getComboAll()
 					startComboGroup = self.state[stateName].data
 
-					comboGroup = updateComboGroupMorph(startComboGroup, endComboGroup)
+					comboGroup = updateComboGroupLazy(startComboGroup, endComboGroup)
 					self.processCombos(comboGroup)
 
-					self.checkFall()
 					self.state.delete(stateName)
+					self.checkFall()
 
 		self.state.update(dt)
 
@@ -157,25 +152,36 @@ class Game(object):
 		If focusX, then only corresponding columns are checked."""
 
 		lowerHoles = self.grid.getLowerHoles(focusX)
+		DEBUG("Lower holes: %s", lowerHoles)
 		if lowerHoles:
 			for pos in lowerHoles:
-				#if "fall#" + str(pos[0]) not in self.state:
-				self.state.transition("fall#" + str(pos[0]), .2, pos)
+				if "fall#" + str(pos[0]) not in self.state:
+					self.state.transition("fall#" + str(pos[0]), .2, pos)
 		return lowerHoles
 
 	def getComboGroups(self):
 		return [self.state[name].data for name in self.state if name.startswith("combo#")]
 
-	def checkCombo(self, pos):
+	def genComboId(self):
+		for i in range(100):
+			if "combo#" + str(i) not in self.state:
+				return i
+		raise RuntimeError("Too much combos")
+
+	def checkCombo(self, comboGroup): # TODO: check if blocks fell
 		"""Check whether there are combo above pos. Return combo group.
 
 		Creates combo state."""
-		comboGroup = self.grid.getComboAfterFall(pos)
 		if comboGroup:
+			DEBUG("Initial combo group %s", comboGroup)
+			fallingX = [pos[0] for pos in self.grid.getLowerHoles()]
+			comboGroup = [combo for combo in comboGroup \
+				if not any(cx in fallingX for cx in [cp[0] for cp in combo])]
+
 			comboGroups = self.getComboGroups()
-			#DEBUG("Combo groups %s in %s", comboGroup, comboGroups)
+			DEBUG("Combo groups %s not in %s", comboGroup, comboGroups)
 			if comboGroup not in comboGroups:
-				self.state.transition("combo#" + str(len(comboGroups)), 1.6, comboGroup)
+				self.state.transition("combo#" + str(self.genComboId()), 2, comboGroup)
 		return comboGroup
 
 	def processCombos(self, comboGroup):
@@ -201,7 +207,8 @@ class Game(object):
 	def swap(self):
 		x, y = self.swapperPos
 		self.grid.swap(x, y)
-		self.checkFall([x, x+1])
+		if not self.checkFall([x, x+1]):
+			self.checkCombo(self.grid.getComboAfterSwap(x, y))
 
 	def processInput(self, name):
 		if name == "swap": self.swap()
@@ -286,22 +293,28 @@ class StateMachine(dict):
 
 	def _shortenName(self, stateName):
 		try:
-			return {'debug': 'D ', 'swap': 's ', 'AI_swap': 'S ', 'fall': 'F ', 'combo': 'C '}[stateName.split('#')[0]]
+			stateName = stateName.split('#')
+			return STATES[stateName[0]] #+ stateName[1] if len(stateName) > 1 else ''
 		except KeyError:
 			raise KeyError("state name not registered")
 
-	def _isChanging(self, stateName):
-		return self[stateName].status in ("starting", "ending")
+	def isChanging(self, stateName):
+		return self[stateName].status == "ending"
 
 	def crepr(self, onlyChanging=False):
 		"""A compact representation"""
-		if not onlyChanging: return '{' + ', '.join("{}{}".format(name, self._shortenStatus(self[name].status)) for name in self) + '}'
-		return '{' + ', '.join("{}{}".format(name, self._shortenStatus(self[name].status)) for name in self if self._isChanging(name)) + '}'
+		if not onlyChanging: return ' '.join("{}{}".format(name, self._shortenStatus(self[name].status)) for name in self)
+		return ' '.join("{}{}".format(name, self._shortenStatus(self[name].status)) for name in self if self.isChanging(name))
+
+	def crepr2(self, onlyChanging=False):
+		"""A compact representation"""
+		if not onlyChanging: return ' '.join(self)
+		return ' '.join(filter(lambda e: self.isChanging(e), self))
 
 	def vcrepr(self, onlyChanging=False):
 		"""A very compact representation"""
-		if not onlyChanging: return ''.join("{}".format(self._shortenName(name)) for name in self)
-		return ''.join("{}".format(self._shortenName(name)) for name in self if self._isChanging(name))
+		if not onlyChanging: return ' '.join(map(self._shortenName, self))
+		return ' '.join(map(self._shortenName, filter(self.isChanging, self)))
 
 	def trepr(self):
 		"""A representation of progression of states"""
