@@ -8,6 +8,7 @@ Tests for Swap
 from time import time, sleep
 
 from swap import *
+from itertoolsExt import flatten
 
 def rotateMatrix(mat):
 	return [[mat[y][x] for y in range(len(mat))] for x in range(len(mat[0]))]
@@ -30,7 +31,7 @@ def test1():
 	print('fallInstant\n' + str(grid))
 
 	combos = grid.getComboAll()
-	combosPos = set(itertools.chain.from_iterable(combos))
+	combosPos = set(flatten(combos))
 	for pos in combosPos: # Remove combos
 		grid[pos] = 0
 	print('getCombo {}:'.format(pos), combos, '\n' + str(combosPos), len(combosPos))
@@ -55,7 +56,7 @@ def test2():
 		if not lastStep: continue
 
 		combos = grid.getComboAll()
-		combosPos = set(itertools.chain.from_iterable(combos))
+		combosPos = set(flatten(combos))
 		#print(combos, combosPos)
 		if combos:
 			for combo in combos:
@@ -127,7 +128,7 @@ def test5():
 	pos1 = (1, 3)
 
 	comboGroup1 = grid.getComboAll()
-	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
+	comboPos1 = set(flatten(comboGroup1))
 	print('getCombo', comboGroup1, '\n' + str(comboPos1), len(comboPos1))
 
 	grid.swap(*pos1)
@@ -136,14 +137,14 @@ def test5():
 	print('fallInstant\n' + str(grid))
 
 	comboGroup2 = grid.getComboAll()
-	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
+	comboPos2 = set(flatten(comboGroup2))
 	print('getCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
 	print()
 	print(grid.reprBlocks())
 	print()
 
 	comboGroup3 = updateComboGroupMorph(comboGroup1, comboGroup2)
-	comboPos3 = set(itertools.chain.from_iterable(comboGroup3))
+	comboPos3 = set(flatten(comboGroup3))
 	print('updateCombo', comboGroup3, '\n' + str(comboPos3), len(comboPos3))
 
 	for pos in comboPos3: # Remove combos
@@ -163,7 +164,7 @@ def test6():
 
 	cg = grid.getComboAll()
 	print(cg)
-	cp = set(itertools.chain.from_iterable(cg))
+	cp = set(flatten(cg))
 	print(cp)
 
 def test7():
@@ -177,7 +178,7 @@ def test7():
 	pos1 = (1, 3)
 
 	comboGroup1 = grid.getComboAll()
-	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
+	comboPos1 = set(flatten(comboGroup1))
 	print('getCombo', comboGroup1, '\n' + str(comboPos1), len(comboPos1))
 
 	grid.swap(*pos1)
@@ -186,14 +187,14 @@ def test7():
 	print('fallInstant\n' + str(grid))
 
 	comboGroup2 = grid.getComboAll()
-	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
+	comboPos2 = set(flatten(comboGroup2))
 	print('getCombo {}:'.format(pos1), comboGroup2, '\n' + str(comboPos2), len(comboPos2))
 	print()
 	print(grid.reprBlocks())
 	print()
 
 	comboGroup3 = updateComboGroupMorph(comboGroup1, comboGroup2)
-	comboPos3 = set(itertools.chain.from_iterable(comboGroup3))
+	comboPos3 = set(flatten(comboGroup3))
 	print('updateCombo', comboGroup3, '\n' + str(comboPos3), len(comboPos3))
 
 	#for pos in comboPos3: # Remove combos
@@ -265,11 +266,30 @@ def test9():
 		for hole in holes1:
 			comboGroup = grid.getComboAfterFall(hole)
 			print("Combos after fall {}:".format(hole), comboGroup)
-			for pos in set(itertools.chain.from_iterable(comboGroup)): # Remove combos
+			for pos in set(flatten(comboGroup)): # Remove combos
 				grid[pos] = 0
 			print(grid.reprBlocks())
 
+def test10():
+	_grid = rotateMatrix([\
+	[3, 0, 0, 4, 4, 0],
+	[0, 0, 0, 4, 0, 0],
+	[0, 0, 2, 4, 4, 0],
+	[1, 1, 1, 2, 2, 2]])
+	grid = Grid(data=_grid, nbSymbols=5)
+	print(grid.reprBlocks())
+	isBlock = True
+
+	print("block range vert (0,0):", grid.blockRangeVertical(0, 0, isBlock))
+	print("block range vert (0,1):", grid.blockRangeVertical(0, 1, isBlock))
+	print("block range vert (0,3):", grid.blockRangeVertical(0, 3, isBlock))
+	print("block range vert (1,0):", grid.blockRangeVertical(1, 0, isBlock))
+	print("block range vert (3,1):", grid.blockRangeVertical(3, 1, isBlock))
+	print("block range vert (3,3):", grid.blockRangeVertical(3, 3, isBlock))
+	print("block range horiz (0,0):", grid.blockRangeHorizontal(0, 0, isBlock))
+	print("block range horiz (3,2):", grid.blockRangeHorizontal(3, 2, isBlock))
+	print("block range horiz (3,3):", grid.blockRangeHorizontal(3, 3, isBlock))
 
 if __name__ == '__main__':
 	#print("\033[104mkuro\033[00mmatsu")
-	test9()
+	test10()

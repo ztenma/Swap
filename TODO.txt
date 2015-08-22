@@ -1,0 +1,13 @@
+TODO
+
+- use numpy for grid
+- split game state logic in State instances, with start and end callbacks
+- manage globally fall and combo states
+- profile game and UI
+
+FIXME
+
+- combos non détruits
+- autoriser combo si aucun trou en dessous (de chaque colonne concernée)
+- algo morph
+- multiplier

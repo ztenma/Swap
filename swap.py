@@ -19,7 +19,7 @@ Battle vs CPU/Human
 import sys
 from random import randrange
 from time import time
-import itertools
+from itertoolsExt import flatten
 
 from log import *
 from grid import Grid, Combo, Block
@@ -126,10 +126,10 @@ class Game(object):
 					if self.grid.isHole(*pos):
 						self.state.transition(stateName, .2, pos)
 					else: # Falling ended
-						if sum(1 for name in self.state if name.startswith("fall#")) == 0:
-							self.scoreMultiplier = 1
 						self.state.delete(stateName)
-						self.checkCombo(self.grid.getComboAfterFall(pos))
+						sumFalls = sum(1 for name in self.state if name.startswith("fall#"))
+						if sumFalls == 0 and not self.checkCombo("fall", pos):
+							self.scoreMultiplier = 1
 
 			elif stateName.startswith("combo#"):
 				if self.state[stateName].status == "ending":
@@ -168,10 +168,17 @@ class Game(object):
 				return i
 		raise RuntimeError("Too much combos")
 
-	def checkCombo(self, comboGroup): # TODO: check if blocks fell
+	def checkCombo(self, checkType, pos): # TODO: check if blocks fell
 		"""Check whether there are combo above pos. Return combo group.
 
 		Creates combo state."""
+
+		if checkType == "fall":
+			comboGroup = self.grid.getComboAfterFall(pos)
+		elif checkType == "swap":
+			comboGroup = self.grid.getComboAfterSwap(pos)
+		else: raise ValueError("Wrong check type: " + str(checkType))
+
 		if comboGroup:
 			DEBUG("Initial combo group %s", comboGroup)
 			fallingX = [pos[0] for pos in self.grid.getLowerHoles()]
@@ -189,7 +196,7 @@ class Game(object):
 			self.score += scoreIt(len(combo)) * self.scoreMultiplier
 			self.scoreMultiplier += 1
 		#DEBUG("Score multiplier %s", self.scoreMultiplier)
-		comboGroupPos = set(itertools.chain.from_iterable(comboGroup))
+		comboGroupPos = set(flatten(comboGroup))
 		for pos in comboGroupPos: # Remove combos
 			self.grid[pos] = 0
 
@@ -208,7 +215,7 @@ class Game(object):
 		x, y = self.swapperPos
 		self.grid.swap(x, y)
 		if not self.checkFall([x, x+1]):
-			self.checkCombo(self.grid.getComboAfterSwap(x, y))
+			self.checkCombo("swap", (x, y))
 
 	def processInput(self, name):
 		if name == "swap": self.swap()
@@ -238,8 +245,8 @@ def updateComboGroupMorph(comboGroup1, comboGroup2): # TODO: pas ok
 	with the difference set"""
 
 	# We compute the lists of blocks involved in each combo group
-	comboPos1 = set(itertools.chain.from_iterable(comboGroup1))
-	comboPos2 = set(itertools.chain.from_iterable(comboGroup2))
+	comboPos1 = set(flatten(comboGroup1))
+	comboPos2 = set(flatten(comboGroup2))
 	diffPos = comboPos1.intersection(comboPos2)
 	#DEBUG("cp: %s %s", comboPos1, comboPos2)
 	#DEBUG("diff pos: %s", diffPos)
