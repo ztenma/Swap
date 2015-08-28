@@ -4,7 +4,7 @@
 
 import sys
 from random import randrange
-import itertools
+from itertoolsExt import flatten
 import urwid
 
 import swap
@@ -110,8 +110,7 @@ class TUI(object):
 
 				comboGroups = self.game.getComboGroups()
 				for cg in comboGroups:
-					cgp = set(itertools.chain.from_iterable(cg))
-					for block in cgp:
+					for block in set(flatten(cg)):
 						if block.pos == (x, y):
 							chars = ['*', '*']
 
@@ -123,8 +122,6 @@ class TUI(object):
 
 				out.append((color, ''.join(chars)))
 			out.append('\n')
-		#out = [[(TUI.COLORS[grid[i][j]][0], '  ')\
-		#for i in range(grid.width)] + ['\n'] for j in range(grid.height)]
 		return out
 
 if __name__ == '__main__':

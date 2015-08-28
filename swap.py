@@ -46,59 +46,6 @@ class Game(object):
 
 		INFO("Starting Swap")
 
-	"""def update(self):
-
-		currentTime = time()
-		dt = currentTime - self.lastTime
-		self.lastTime = currentTime
-
-		if self.pause: return
-
-		#DEBUG("State %s", self.state.crepr())
-
-		for stateName in tuple(self.state.keys()):
-
-			if stateName == "AI_swap":
-				if self.state["AI_swap"].status == "starting":
-					self.swapperPos = self.randomSwapChoice()
-				elif self.state["AI_swap"].status == "ending":
-					self.grid.swap(*self.swapperPos)
-					if "fall" not in self.state:
-						self.state.transition("fall", .2)
-					self.state.transition("AI_swap", .5)
-
-			elif stateName == "fall":
-				if self.state["fall"].status == "ending":
-					isLastStep = self.grid.fallStep()
-					if isLastStep:
-						comboGroup = self.grid.getComboAll()
-						if comboGroup:
-							comboGroups = self.getComboGroups()
-							comboNb = len(comboGroups)
-							#DEBUG("Combo groups %s in %s", comboGroup, comboGroups)
-							if not comboGroup in comboGroups:
-								self.state.transition("combo#" + str(comboNb), 1.6, comboGroup)
-						else:
-							self.scoreMultiplier = 1
-						self.state.delete("fall")
-					else:
-						self.state.transition("fall", .1)
-
-			elif stateName.startswith("combo#"):
-				if self.state[stateName].status == "ending":
-					#DEBUG("Combos %s\n%s", stateName, self.state[stateName].data)
-					endComboGroup = self.grid.getComboAll()
-					startComboGroup = self.state[stateName].data
-
-					comboGroup = updateComboGroupMorph(startComboGroup, endComboGroup)
-					self.processCombos(comboGroup)
-
-					if "fall" not in self.state:
-						self.state.transition("fall", .2)
-					self.state.delete(stateName)
-
-		self.state.update(dt)"""
-
 	def update(self): # TODO problème de synchro fall/combo
 
 		currentTime = time()
@@ -114,7 +61,7 @@ class Game(object):
 
 			if stateName == "AI_swap":
 				if self.state["AI_swap"].status == "starting":
-					self.swapperPos = self.randomSwapChoice()
+					self.swapperPos = self.grid.randomSwap()
 				elif self.state["AI_swap"].status == "ending":
 					self.swap()
 					self.state.transition("AI_swap", 1.5)
@@ -126,18 +73,21 @@ class Game(object):
 					if self.grid.isHole(*pos):
 						self.state.transition(stateName, .2, pos)
 					else: # Falling ended
-						self.state.delete(stateName)
-						sumFalls = sum(1 for name in self.state if name.startswith("fall#"))
-						if sumFalls == 0 and not self.checkCombo("fall", pos):
-							self.scoreMultiplier = 1
+						lowerHoles = self.grid.lowerHoles([pos[0]])
+						if lowerHoles:
+							self.state.transition(stateName, .2, lowerHoles[0])
+						else:
+							self.state.delete(stateName)
+							sumFalls = sum(1 for name in self.state if name.startswith("fall#"))
+							if sumFalls == 0 and not self.checkCombo("fall", pos):
+								self.scoreMultiplier = 1
 
 			elif stateName.startswith("combo#"):
 				if self.state[stateName].status == "ending":
 					#DEBUG("Combos %s\n%s", stateName, self.state[stateName].data)
-					endComboGroup = self.grid.getComboAll()
-					startComboGroup = self.state[stateName].data
+					comboGroup = self.state[stateName].data
 
-					comboGroup = updateComboGroupLazy(startComboGroup, endComboGroup)
+					comboGroup = self.updateComboGroupLazy(comboGroup)
 					self.processCombos(comboGroup)
 
 					self.state.delete(stateName)
@@ -151,8 +101,8 @@ class Game(object):
 		Creates fall state for each hole found.
 		If focusX, then only corresponding columns are checked."""
 
-		lowerHoles = self.grid.getLowerHoles(focusX)
-		DEBUG("Lower holes: %s", lowerHoles)
+		lowerHoles = self.grid.lowerHoles(focusX)
+		#DEBUG("Lower holes: %s", lowerHoles)
 		if lowerHoles:
 			for pos in lowerHoles:
 				if "fall#" + str(pos[0]) not in self.state:
@@ -168,40 +118,34 @@ class Game(object):
 				return i
 		raise RuntimeError("Too much combos")
 
-	def checkCombo(self, checkType, pos): # TODO: check if blocks fell
-		"""Check whether there are combo above pos. Return combo group.
+	def checkCombo(self, checkType, pos):
+		"""Check whether there are combos. Return combo group.
 
 		Creates combo state."""
 
 		if checkType == "fall":
-			comboGroup = self.grid.getComboAfterFall(pos)
+			comboGroup = self.grid.combosAll()
 		elif checkType == "swap":
-			comboGroup = self.grid.getComboAfterSwap(pos)
+			comboGroup = self.grid.combosAfterSwap(pos)
 		else: raise ValueError("Wrong check type: " + str(checkType))
 
 		if comboGroup:
-			DEBUG("Initial combo group %s", comboGroup)
-			fallingX = [pos[0] for pos in self.grid.getLowerHoles()]
-			comboGroup = [combo for combo in comboGroup \
-				if not any(cx in fallingX for cx in [cp[0] for cp in combo])]
+			DEBUG("Found combo group %s", comboGroup)
+			#fallingX = [pos[0] for pos in self.grid.lowerHoles()]
+			#comboGroup = list(filter(lambda combo: not any(p[0] in fallingX for p in combo), comboGroup))
 
-			comboGroups = self.getComboGroups()
-			DEBUG("Combo groups %s not in %s", comboGroup, comboGroups)
-			if comboGroup not in comboGroups:
+			if comboGroup not in self.getComboGroups():
 				self.state.transition("combo#" + str(self.genComboId()), 2, comboGroup)
+			#DEBUG("Filtered combo group %s", comboGroup)
 		return comboGroup
 
 	def processCombos(self, comboGroup):
 		for combo in comboGroup:
 			self.score += scoreIt(len(combo)) * self.scoreMultiplier
 			self.scoreMultiplier += 1
-		#DEBUG("Score multiplier %s", self.scoreMultiplier)
 		comboGroupPos = set(flatten(comboGroup))
 		for pos in comboGroupPos: # Remove combos
 			self.grid[pos] = 0
-
-	def randomSwapChoice(self):
-		return self.grid.getRandomSwap()
 
 	def moveSwapper(self, direction):
 		x, y = self.swapperPos
@@ -214,50 +158,53 @@ class Game(object):
 	def swap(self):
 		x, y = self.swapperPos
 		self.grid.swap(x, y)
-		if not self.checkFall([x, x+1]):
-			self.checkCombo("swap", (x, y))
+		self.checkFall([x, x+1])
+		self.checkCombo("swap", (x, y))
 
 	def processInput(self, name):
 		if name == "swap": self.swap()
 		elif name in ("up", "right", "down", "left"): self.moveSwapper(name)
 
-def updateComboGroupLazy(comboGroup1, comboGroup2):
-	"""Computes the final combo group based on combo state start and end, using
-	the lazy startegy.
+	def updateComboGroupLazy(self, comboGroup):
+		"""Computes the final combo group based on combo state start and end, using
+the lazy startegy.
 
-	Lazy:
-	include any combo from start state that remains in end state"""
+Lazy:
+include any combo from start state that remains in end state"""
 
-	comboGroup3 = []
+		newComboGroup = []
+		for combo in comboGroup:
+			orientation = combo.orientation()
+			if orientation == 'h': comboTest = self.grid.comboHorizontalAround(*combo[0])
+			elif orientation == 'v': comboTest = self.grid.comboVerticalAround(*combo[0])
+			else: raise NotImplemented
+			if combo == comboTest:
+				newComboGroup.append(combo)
+		return newComboGroup
 
-	for combo2 in comboGroup2:
-		if combo2 in comboGroup1:
-			comboGroup3.append(combo2)
-	return comboGroup3
+	def updateComboGroupMorph(self, comboGroup1, comboGroup2): # TODO
+		"""Computes the final combo group based on combo state start and end, using
+the morph startegy.
 
-def updateComboGroupMorph(comboGroup1, comboGroup2): # TODO: pas ok
-	"""Computes the final combo group based on combo state start and end, using
-	the morph startegy.
+Morph:
+- compute the difference between the two sets of combo positions,
+- include any combo from end state that has at least one position in common
+with the difference set"""
 
-	Morph:
-	- compute the difference between the two sets of combo positions,
-	- include any combo from end state that has at least one position in common
-	with the difference set"""
+		# We compute the lists of blocks involved in each combo group
+		comboPos1 = set(flatten(comboGroup1))
+		comboPos2 = set(flatten(comboGroup2))
+		diffPos = comboPos1.intersection(comboPos2)
+		#DEBUG("cp: %s %s", comboPos1, comboPos2)
+		#DEBUG("diff pos: %s", diffPos)
+		comboGroup3 = []
 
-	# We compute the lists of blocks involved in each combo group
-	comboPos1 = set(flatten(comboGroup1))
-	comboPos2 = set(flatten(comboGroup2))
-	diffPos = comboPos1.intersection(comboPos2)
-	#DEBUG("cp: %s %s", comboPos1, comboPos2)
-	#DEBUG("diff pos: %s", diffPos)
-	comboGroup3 = []
-
-	for combo2 in comboGroup2:
-		for pos in diffPos:
-			if pos in combo2:
-				comboGroup3.append(combo2)
-	DEBUG("morph combo group: %s", comboGroup3)
-	return comboGroup3
+		for combo2 in comboGroup2:
+			for pos in diffPos:
+				if pos in combo2:
+					comboGroup3.append(combo2)
+		DEBUG("morph combo group: %s", comboGroup3)
+		return comboGroup3
 
 class StateMachine(dict):
 	"""Represents a dynamic concurrent state machine.

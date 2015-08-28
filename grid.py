@@ -81,14 +81,14 @@ class Grid(object):
 		"""Swap two blocks horizontally"""
 		self[x][y], self[x+1][y] = self[x+1][y], self[x][y]
 
+	def isHole(self, x, y):
+		return self[x][y] == 0 and any(self[x][j] != 0 for j in range(y))
+
 	def fallStepPos(self, x, y):
 		"""Make blocks above pos fall one step"""
 		for j in reversed(range(y)):
 			self[x][j+1] = self[x][j]
 		self[x][j] = 0
-
-	def isHole(self, x, y):
-		return self[x][y] == 0 and any(self[x][j] != 0 for j in range(y))
 
 	def fallInstant(self, focusX=None):
 		"""Make blocks fall instantly."""
@@ -109,7 +109,7 @@ class Grid(object):
 					break
 		return isLastStep
 
-	def getLowerHoles(self, focusX=None):
+	def lowerHoles(self, focusX=None):
 		holes = []
 		for x in (focusX if focusX != None else range(self.width)):
 			for y in reversed(range(self.height)):
@@ -118,7 +118,7 @@ class Grid(object):
 				if self[x][y] == 0: break # Break at any void in column
 		return holes
 
-	def getComboLine(self, y):
+	def combosLine(self, y):
 		"""Look for combos in line and return them"""
 		comboGroup = []
 		comboCount = 1
@@ -140,7 +140,7 @@ class Grid(object):
 				comboGroup.append(combo)
 		return comboGroup
 
-	def getComboColumn(self, x):
+	def combosColumn(self, x):
 		"""Look for combos in column and return them"""
 		comboGroup = []
 		comboCount = 1
@@ -162,103 +162,70 @@ class Grid(object):
 				comboGroup.append(combo)
 		return comboGroup
 
-	def getComboAll(self):
-		"""Test existance of combos in the whole grid
-Return the list of combos found"""
+	def combosAll(self):
+		"""Return the list of combos found in the whole grid"""
 		comboGroup = []
 
 		for x in range(self.width):
-			comboGroup.extend(self.getComboColumn(x))
+			comboGroup.extend(self.combosColumn(x))
 
 		for y in range(self.height):
-			comboGroup.extend(self.getComboLine(y))
+			comboGroup.extend(self.combosLine(y))
 
 		return comboGroup
 
-	def getComboRangeAroundLine(self, x, y):
-		"""Look for combo around pos in line and return them"""
-		ref = self[x][y]
-		if ref == 0: return range(0)
-
-		# Looking left then right
-		i = x
-		while i >= 0 and self[i-1][y] == ref: i -= 1
-		comboStart = i
-		i = x
-		while i < self.width-1 and self[i+1][y] == ref: i += 1
-
-		return range(comboStart, i+1)
-
-	def getComboRangeAroundColumn(self, x, y):
-		"""Look for combo around pos in column and return them"""
-		ref = self[x][y]
-		if ref == 0: return range(0)
-
-		j = y
-		while j > 0 and self[x][j-1] == ref: j -= 1
-		comboStart = j
-		j = y
-		while j < self.height-1 and self[x][j+1] == ref: j += 1
-
-		return range(comboStart, j+1)
-
-	def blockRangeHorizontal(self, x, y, combo=False):
+	def blockRangeVerticalAround(self, x, y):
 		"""Return the range corresponding to the group of blocks around (x, y).
 
 Return a void range if there is no block at (x, y).
 """
-		f = lambda e: bool(e) and e == self._grid[x][y] if combo else bool
+		return range(y+1 - indexFalse(self._grid[x][y::-1]),
+			y + indexFalse(self._grid[x][y:]))
+
+	def comboHorizontalAround(self, x, y, minLen=3):
+
+		f = lambda e: bool(e) and e == self._grid[x][y]
 		p1 = (e[y] for e in self._grid[x::-1])
 		p2 = (e[y] for e in self._grid[x:])
-		return range(x+1 - indexFalse(p1, f), x + indexFalse(p2, f))
+		comboRange = range(x+1 - indexFalse(p1, f), x + indexFalse(p2, f))
+		if len(comboRange) >= minLen:
+			return Combo([(i, y) for i in comboRange], self._grid[x][y])
+		return None
 
-	def blockRangeVertical(self, x, y, combo=False):
-		"""Return the range corresponding to the group of blocks around (x, y).
+	def comboVerticalAround(self, x, y, minLen=3):
 
-Return a void range if there is no block at (x, y).
-"""
-		f = lambda e: bool(e) and e == self._grid[x][y] if combo else bool
+		f = lambda e: bool(e) and e == self._grid[x][y]
 		p1 = self._grid[x][y::-1]
 		p2 = self._grid[x][y:]
-		return range(y+1 - indexFalse(p1, f), y + indexFalse(p2, f))
-
-	def getComboAroundLine(self, x, y): # TEST
-
-		comboRange = self.getComboRangeAroundLine(x, y)
-		if len(comboRange) >= 3:
-			return Combo([(i, y) for i in comboRange], self._grid[x][y])
-		else: return None
-
-	def getComboAroundColumn(self, x, y): # TEST
-
-		comboRange = self.getComboRangeAroundColumn(x, y)
-		if len(comboRange) >= 3:
+		comboRange = range(y+1 - indexFalse(p1, f), y + indexFalse(p2, f))
+		if len(comboRange) >= minLen:
 			return Combo([(x, j) for j in comboRange], self._grid[x][y])
-		else: return None
+		return None
 
-	def getComboAfterSwap(self, pos):
+	def combosAfterSwap(self, pos):
 		"""Test existance of combos around the designated swap position
 Return the group of combos found"""
 		x, y = pos
 		return list(filter(None,
-			[self.getComboAroundLine(x, y),
-			self.getComboAroundColumn(x, y),
-			self.getComboAroundColumn(x+1, y)]))
+			[self.comboHorizontalAround(x, y),
+			self.comboHorizontalAround(x+1, y),
+			self.comboVerticalAround(x, y),
+			self.comboVerticalAround(x+1, y)]))
 
-	def getComboAfterFall(self, formerHole): # TEST
+	def combosAfterFall(self, formerHole): # TEST
 		"""Test existance of combos around a former hole
 Return the list of combos found"""
-		def getBlocksAroundHole():
-			x, y = formerHole
-			yield self.getComboAroundColumn(x, y)
-			for j in self.blockRangeVertical(x, y):
-				yield self.getComboAroundLine(x, j)
+		x, y = formerHole
+		def blocksAroundHole():
+			yield self.comboVerticalAround(x, y)
+			for j in self.blockRangeVerticalAround(x, y):
+				yield self.comboHorizontalAround(x, j)
 
-		r = list(filter(None, getBlocksAboveHole()))
-		DEBUG("Combo after fall: %s %s", self.getBlockRangeAround(x, y, 1), r)
+		r = list(filter(None, blocksAroundHole()))
+		DEBUG("Combo after fall: %s %s", self.blockRangeVerticalAround(x, y), r)
 		return r
 
-	def getRandomBlock(self):
+	def randomBlock(self):
 		totalBlockNb = sum(block != 0 for col in self for block in col)
 		chosenBlock = randrange(totalBlockNb)
 		curBlock = -1
@@ -269,8 +236,8 @@ Return the list of combos found"""
 				if curBlock == chosenBlock:
 					return (x, y)
 
-	def getRandomSwap(self):
-		randX, randY = self.getRandomBlock()
+	def randomSwap(self):
+		randX, randY = self.randomBlock()
 		if randX == 0: return (randX, randY)
 		if randX == self.width - 1: return (randX - 1, randY)
 		return (randX - randrange(2), randY)
@@ -312,6 +279,19 @@ class Combo(MutableSequence):
 	def append(self, e): self.blockList.append(e)
 	def insert(self, i, e): self.blockList.insert(i, e)
 
-	def __eq__(self, other): return self.blockList == other.blockList and self.color == other.color
+	def __eq__(self, other):
+		return isinstance(other, Combo) and self.blockList == other.blockList and self.color == other.color
 	def __repr__(self):
-		return "Combo({}, ".format(self.color) + ', '.join(str(b) for b in self.blockList) + ')'
+		orientation = self.orientation()
+		ref = self.blockList[0]
+		if orientation == 'v':
+			return "C{}({},[{}])".format(self.color, ref[0], ','.join(str(e[1]) for e in self.blockList))
+		if orientation == 'h':
+			return "C{}([{}],{})".format(self.color, ','.join(str(e[0]) for e in self.blockList), ref[1])
+		return "C{}[{}]".format(self.color, ','.join(str(b) for b in self.blockList))
+
+	def orientation(self):
+		ref = self.blockList[0]
+		if all(e[0] == ref[0] for e in self.blockList[1:]): return 'v'
+		if all(e[1] == ref[1] for e in self.blockList[1:]): return 'h'
+		return '?'
