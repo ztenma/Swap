@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: Utf-8 -*-
 
 """Textual User Interface for Swap"""
 
@@ -104,11 +105,12 @@ class TUI(object):
 	def buildMarkup(self, grid):
 		out = []
 		color, chars = None, None
+		comboGroups = self.game.getComboGroups()
+		#DEBUG("Markup combo groups: %s", comboGroups)
 		for y in range(grid.height):
 			for x in range(grid.width):
 				color, chars = TUI.COLORS[grid[x][y]][0], [' ', ' ']
 
-				comboGroups = self.game.getComboGroups()
 				for cg in comboGroups:
 					for block in set(flatten(cg)):
 						if block.pos == (x, y):

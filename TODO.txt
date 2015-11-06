@@ -2,13 +2,11 @@ TODO
 
 - use numpy for grid -> factorize functions with extended slicing
 - split game state logic in State instances, with start and end callbacks
-- manage globally fall and combo states
+- manage globally fall and combo states !!!
 - profile game and UI
 
 FIXME
 
-- états fall détruits avant fin
 - combos non détruits (pas/mauvaise détection)
-- autoriser combo si aucun trou en dessous (de chaque colonne concernée)
 - algo morph
 - multiplier

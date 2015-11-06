@@ -46,7 +46,7 @@ class Game(object):
 
 		INFO("Starting Swap")
 
-	def update(self): # TODO problème de synchro fall/combo
+	def update(self):
 
 		currentTime = time()
 		dt = currentTime - self.lastTime
@@ -79,7 +79,8 @@ class Game(object):
 						else:
 							self.state.delete(stateName)
 							sumFalls = sum(1 for name in self.state if name.startswith("fall#"))
-							if sumFalls == 0 and not self.checkCombo("fall", pos):
+							comboGroup = self.checkCombo("fall", pos)
+							if sumFalls == 0 and not comboGroup:
 								self.scoreMultiplier = 1
 
 			elif stateName.startswith("combo#"):
@@ -91,11 +92,12 @@ class Game(object):
 					self.processCombos(comboGroup)
 
 					self.state.delete(stateName)
+					#DEBUG("After delete combo: %s", self.getComboGroups())
 					self.checkFall()
 
 		self.state.update(dt)
 
-	def checkFall(self, focusX=None): # TODO then rewrite update()
+	def checkFall(self, focusX=None):
 		"""Check whether some blocks have to fall. Return lower holes.
 
 		Creates fall state for each hole found.
@@ -123,20 +125,51 @@ class Game(object):
 
 		Creates combo state."""
 
-		if checkType == "fall":
+		if True:#checkType == "fall":
 			comboGroup = self.grid.combosAll()
 		elif checkType == "swap":
 			comboGroup = self.grid.combosAfterSwap(pos)
 		else: raise ValueError("Wrong check type: " + str(checkType))
 
 		if comboGroup:
-			DEBUG("Found combo group %s", comboGroup)
-			#fallingX = [pos[0] for pos in self.grid.lowerHoles()]
-			#comboGroup = list(filter(lambda combo: not any(p[0] in fallingX for p in combo), comboGroup))
+			DEBUG("Found combo group %s\nComboGroups: %s", comboGroup, self.getComboGroups())
+			fallingX = [pos[0] for pos in self.grid.lowerHoles()]
 
-			if comboGroup not in self.getComboGroups():
+			# Filter already found combos and update old combo groups
+			oldStates = [self.state[name] for name in self.state if name.startswith("combo#")]
+			for state in oldStates: # every state
+				oldComboGroup = state.data
+				oci = 0
+				while oci < len(oldComboGroup): # every stored combo
+					#if oldComboGroup[oci] not in comboGroup:
+					#	DEBUG('Delete old combo: %s', oldComboGroup[oci])
+					#	oldComboGroup.pop(oci)
+					#	if not oldComboGroup:
+					#		self.state.delete(state.name)
+					#	continue
+					nci = 0
+					while nci < len(comboGroup): # every current combo
+						#DEBUG('Current combo group: %s', comboGroup)
+						if any(p[0] in fallingX for p in comboGroup[nci]):
+							DEBUG('Filter#1 combo: %s', comboGroup[nci])
+							comboGroup.pop(nci)
+							continue
+						# If any common block
+						if comboGroup[nci] and sum(p in oldComboGroup[oci] for p in comboGroup[nci]) > 1:
+							if oldComboGroup[oci] != comboGroup[nci]:
+								DEBUG('Update old combo: %s -> %s', oldComboGroup[oci], comboGroup[nci])
+								oldComboGroup[oci] = comboGroup[nci] # Update old combo
+							else:
+								DEBUG('Filter#2 combo: %s', comboGroup[nci])
+							comboGroup.pop(nci)
+							continue
+						nci += 1
+					oci += 1
+
+			DEBUG("Add combo group %s", comboGroup)
+			if comboGroup:
 				self.state.transition("combo#" + str(self.genComboId()), 2, comboGroup)
-			#DEBUG("Filtered combo group %s", comboGroup)
+
 		return comboGroup
 
 	def processCombos(self, comboGroup):
@@ -221,7 +254,7 @@ class StateMachine(dict):
 		if fromStateName:
 			del self[fromStateName]
 		#TODO: if duration == 0: # directly call end callback
-		self[toStateName] = State(duration, data)
+		self[toStateName] = State(toStateName, duration, data)
 		#DEBUG("Transition\n%s", repr(self))
 
 	def delete(self, stateName):
@@ -282,7 +315,8 @@ A state can have finite or infinite duration (None value).
 A status attribute describe whether the state is starting, ongoing or ending.
 If necessary, data can be stored for the purpose of state logic."""
 
-	def __init__(self, duration=None, data=None):
+	def __init__(self, name=None, duration=None, data=None):
+		self.name = name
 		self.status = "starting"
 		self.duration = duration
 		self.elapsedTime = 0

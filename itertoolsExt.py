@@ -160,7 +160,7 @@ If there is no false value, return the length of the iterable"""
 		if not pred(e): return i
 	return i+1
 
-def random_product(*args, repeat=1):
+def random_product(repeat=1, *args):
 	"Random selection from itertools.product(*args, **kwds)"
 	pools = [tuple(pool) for pool in args] * repeat
 	return tuple(random.choice(pool) for pool in pools)
