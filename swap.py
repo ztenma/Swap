@@ -24,8 +24,8 @@ from itertoolsExt import flatten
 from log import *
 from grid import Grid, Combo, Block
 
-SCORES = [2, 5, 20, 80, 200, 500, 1000, 2000, 4000, 6000, 8000]
-scoreIt = lambda x: SCORES[x-3] if x <= 10 else 10000
+SCORES = [1, 2, 5, 10, 20, 50, 100, 200, 400, 600, 800]
+scoreIt = lambda x: SCORES[x-3] if x <= 10 else 1000
 
 STATES = {'debug': 'D', 'swap': 's', 'AI_swap': 'S', 'fall': 'F', 'combo': 'C'}
 
@@ -125,7 +125,7 @@ class Game(object):
 
 		Creates combo state."""
 
-		if True:#checkType == "fall":
+		if checkType == "fall":
 			comboGroup = self.grid.combosAll()
 		elif checkType == "swap":
 			comboGroup = self.grid.combosAfterSwap(pos)
@@ -139,7 +139,7 @@ class Game(object):
 			oldStates = [self.state[name] for name in self.state if name.startswith("combo#")]
 			for state in oldStates: # every state
 				oldComboGroup = state.data
-				oci = 0
+				oci = 0 # old combo index
 				while oci < len(oldComboGroup): # every stored combo
 					#if oldComboGroup[oci] not in comboGroup:
 					#	DEBUG('Delete old combo: %s', oldComboGroup[oci])
@@ -147,7 +147,7 @@ class Game(object):
 					#	if not oldComboGroup:
 					#		self.state.delete(state.name)
 					#	continue
-					nci = 0
+					nci = 0 # new combo index
 					while nci < len(comboGroup): # every current combo
 						#DEBUG('Current combo group: %s', comboGroup)
 						if any(p[0] in fallingX for p in comboGroup[nci]):
@@ -296,7 +296,7 @@ class StateMachine(dict):
 	def crepr2(self, onlyChanging=False):
 		"""A compact representation"""
 		if not onlyChanging: return ' '.join(self)
-		return ' '.join(filter(lambda e: self.isChanging(e), self))
+		return ' '.join(filter(self.isChanging, self))
 
 	def vcrepr(self, onlyChanging=False):
 		"""A very compact representation"""

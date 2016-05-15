@@ -3,10 +3,10 @@ TODO
 - use numpy for grid -> factorize functions with extended slicing
 - split game state logic in State instances, with start and end callbacks
 - manage globally fall and combo states !!!
-- profile game and UI
+- profile game and UI, make the game faster and lighter
 
 FIXME
 
-- combos non détruits (pas/mauvaise détection)
-- algo morph
-- multiplier
+- algo morph?
+- multiplier?
+- combosAfterSwap?
