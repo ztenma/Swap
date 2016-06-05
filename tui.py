@@ -4,6 +4,7 @@
 """Textual User Interface for Swap"""
 
 import sys
+from time import time
 from random import randrange
 from itertoolsExt import flatten
 import urwid
@@ -16,7 +17,10 @@ class TUI(object):
 	('g', 'dark green'), ('m', 'dark magenta'), ('c', 'dark cyan'), ('z', 'light gray')]
 
 	def __init__(self):
-		self.DT = .04
+		self.GAME_DT = .05
+		self.UI_DT = .1
+		self.timer = self.UI_DT
+		self.last_time = time()
 		self.game = swap.Game()
 
 		self.buildUI()
@@ -93,13 +97,23 @@ class TUI(object):
 		self.multiplierLabel.set_text('x' + str(self.game.scoreMultiplier))
 
 	def update(self, loop, userData):
-		self.game.update()
+		
 		if not self.game.pause:
-			self.updateUI()
-		self.mainLoop.set_alarm_in(self.DT, self.update)
+			self.game.update()
+			if self.timer <= 0:
+				self.updateUI()
+				self.timer = self.UI_DT
+			# Timing
+			t = time()
+			self.timer -= t - self.last_time
+			self.last_time = t
+			
+		# Schedule update
+		self.mainLoop.set_alarm_in(self.GAME_DT, self.update)
 
 	def updateDebugUI(self, loop, userData):
-		self.stateLabel.set_text(self.game.state.vcrepr())
+		if not self.game.pause:
+			self.stateLabel.set_text(self.game.state.vcrepr())
 		self.mainLoop.set_alarm_in(.2, self.updateDebugUI)
 
 	def buildMarkup(self, grid):

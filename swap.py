@@ -54,8 +54,8 @@ class Game(object):
 
 		if self.pause: return
 
-		if any(self.state.isChanging(e) for e in self.state):
-			DEBUG("State: %s", self.state.vcrepr())
+		#if any(self.state.isChanging(e) for e in self.state):
+		#	DEBUG("State: %s", self.state.vcrepr())
 
 		for stateName in tuple(self.state.keys()):
 
@@ -126,13 +126,13 @@ class Game(object):
 		Creates combo state."""
 
 		if checkType == "fall":
-			comboGroup = self.grid.combosAll()
+			comboGroup = self.grid.combosAfterFall(pos)
 		elif checkType == "swap":
 			comboGroup = self.grid.combosAfterSwap(pos)
 		else: raise ValueError("Wrong check type: " + str(checkType))
 
 		if comboGroup:
-			DEBUG("Found combo group %s\nComboGroups: %s", comboGroup, self.getComboGroups())
+			#DEBUG("Found combo group %s\nComboGroups: %s", comboGroup, self.getComboGroups())
 			fallingX = [pos[0] for pos in self.grid.lowerHoles()]
 
 			# Filter already found combos and update old combo groups
@@ -141,12 +141,6 @@ class Game(object):
 				oldComboGroup = state.data
 				oci = 0 # old combo index
 				while oci < len(oldComboGroup): # every stored combo
-					#if oldComboGroup[oci] not in comboGroup:
-					#	DEBUG('Delete old combo: %s', oldComboGroup[oci])
-					#	oldComboGroup.pop(oci)
-					#	if not oldComboGroup:
-					#		self.state.delete(state.name)
-					#	continue
 					nci = 0 # new combo index
 					while nci < len(comboGroup): # every current combo
 						#DEBUG('Current combo group: %s', comboGroup)

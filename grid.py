@@ -123,11 +123,11 @@ class Grid(object):
 		comboGroup = []
 		comboCount = 1
 
-		#print('line:', [self[i][y] for i in range(self.width)])
+		#DEBUG('line:', [self[i][y] for i in range(self.width)])
 		# Iterate through line
 		for x in range(self.width):
 			ref = self[x][y]
-			#print('({},{}) ref {} xcombo {}'.format(x, y, ref, comboCount))
+			#DEBUG('({},{}) ref {} xcombo {}'.format(x, y, ref, comboCount))
 			if ref != 0 and x >= 1 and ref == self[x-1][y]:
 				comboCount += 1
 			if self[x-1][y] != ref:
@@ -145,11 +145,11 @@ class Grid(object):
 		comboGroup = []
 		comboCount = 1
 
-		#print('column:', [self[x][j] for j in range(self.height)])
+		#DEBUG('column:', [self[x][j] for j in range(self.height)])
 		# Iterate through column
 		for y in range(self.height):
 			ref = self[x][y]
-			#print('({},{}) ref {} ycombo {}'.format(x, y, ref, comboCount))
+			#DEBUG('({},{}) ref {} ycombo {}'.format(x, y, ref, comboCount))
 			if ref != 0 and y >= 1 and ref == self[x][y-1]:
 				comboCount += 1
 			if ref != self[x][y-1]:
