@@ -24,7 +24,7 @@ from itertoolsExt import flatten
 from log import *
 from grid import Grid, Combo, Block
 
-SCORES = [1, 2, 5, 10, 20, 50, 100, 200, 400, 600, 800]
+SCORES = [2, 3, 5, 10, 20, 50, 100, 200, 400, 600, 800]
 scoreIt = lambda x: SCORES[x-3] if x <= 10 else 1000
 
 STATES = {'debug': 'D', 'swap': 's', 'AI_swap': 'S', 'fall': 'F', 'combo': 'C'}
@@ -139,8 +139,10 @@ class Game(object):
 			oldStates = [self.state[name] for name in self.state if name.startswith("combo#")]
 			for state in oldStates: # every state
 				oldComboGroup = state.data
+				
 				oci = 0 # old combo index
 				while oci < len(oldComboGroup): # every stored combo
+					
 					nci = 0 # new combo index
 					while nci < len(comboGroup): # every current combo
 						#DEBUG('Current combo group: %s', comboGroup)
@@ -167,10 +169,13 @@ class Game(object):
 		return comboGroup
 
 	def processCombos(self, comboGroup):
-		for combo in comboGroup:
-			self.score += scoreIt(len(combo)) * self.scoreMultiplier
-			self.scoreMultiplier += 1
+		if not len(comboGroup): return
 		comboGroupPos = set(flatten(comboGroup))
+		DEBUG('Score combos: %s %s', scoreIt(len(comboGroupPos)) * self.scoreMultiplier, comboGroup)
+		
+		self.score += scoreIt(len(comboGroupPos)) * self.scoreMultiplier
+		self.scoreMultiplier += 1
+		
 		for pos in comboGroupPos: # Remove combos
 			self.grid[pos] = 0
 
