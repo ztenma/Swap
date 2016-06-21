@@ -42,15 +42,15 @@ class TUI(object):
 
 		scoreTitle = urwid.AttrMap(urwid.Text('Score', align='center'), 'title')
 		scoreCont = urwid.Filler(scoreTitle, 'top', top=2)
-		scoreLabel = urwid.Text(str(self.game.score), align='center')
+		scoreLabel = urwid.Text(str(self.game.players[1].score), align='center')
 
 		multiplierTitle = urwid.AttrMap(urwid.Text('Multiplier', align='center'), 'title')
 		multiplierCont = urwid.Filler(multiplierTitle, 'top', top=2)
-		multiplierLabel = urwid.Text(str(self.game.scoreMultiplier), align='center')
+		multiplierLabel = urwid.Text(str(self.game.players[1].scoreMultiplier), align='center')
 
 		stateTitle = urwid.AttrMap(urwid.Text('State', align='center'), 'title')
 		stateCont = urwid.Filler(stateTitle, 'top', top=2)
-		stateLabel = urwid.Text(self.game.state.vcrepr(), align='left')
+		stateLabel = urwid.Text(self.game.players[1].stateMachine.vcrepr(), align='left')
 
 		statsPile = urwid.Pile([scoreCont,
 			urwid.Filler(urwid.AttrMap(scoreLabel, 'stats'), 'top', top=1),
@@ -77,9 +77,9 @@ class TUI(object):
 		if key == ' ':
 			self.game.pause = not self.game.pause
 		elif key in ('up', 'right', 'down', 'left'):
-			self.game.processInput(key)
+			self.game.processInputEvent(key)
 		elif key == "x":
-			self.game.processInput("swap")
+			self.game.processInputEvent("swap")
 		elif key == '+':
 			self.scoreLabel.base_widget.set_text("test")
 		elif key in ('q', 'Q'):
@@ -91,10 +91,10 @@ class TUI(object):
 		self.mainLoop.run()
 
 	def updateUI(self):
-		#self.leftGrid.set_text(self.buildMarkup(self.game.grid))
-		self.rightGrid.set_text(self.buildMarkup(self.game.grid))
-		self.scoreLabel.set_text(str(self.game.score))
-		self.multiplierLabel.set_text('x' + str(self.game.scoreMultiplier))
+		self.leftGrid.set_text(self.buildMarkup(self.game.players[0]))
+		self.rightGrid.set_text(self.buildMarkup(self.game.players[1]))
+		self.scoreLabel.set_text(str(self.game.players[1].score))
+		self.multiplierLabel.set_text('x' + str(self.game.players[1].scoreMultiplier))
 
 	def update(self, loop, userData):
 		
@@ -113,24 +113,24 @@ class TUI(object):
 
 	def updateDebugUI(self, loop, userData):
 		if not self.game.pause:
-			self.stateLabel.set_text(self.game.state.vcrepr())
+			self.stateLabel.set_text(self.game.players[1].stateMachine.vcrepr())
 		self.mainLoop.set_alarm_in(.2, self.updateDebugUI)
 
-	def buildMarkup(self, grid):
+	def buildMarkup(self, player):
 		out = []
 		color, chars = None, None
-		comboGroups = self.game.getComboGroups()
+		comboGroups = self.game.getComboGroups(player)
 		#DEBUG("Markup combo groups: %s", comboGroups)
-		for y in range(grid.height):
-			for x in range(grid.width):
-				color, chars = TUI.COLORS[grid[x][y]][0], [' ', ' ']
+		for y in range(player.grid.height):
+			for x in range(player.grid.width):
+				color, chars = TUI.COLORS[player.grid[x][y]][0], [' ', ' ']
 
 				for cg in comboGroups:
 					for block in set(flatten(cg)):
 						if block.pos == (x, y):
 							chars = ['*', '*']
 
-				spx, spy = self.game.swapperPos
+				spx, spy = player.swapperPos
 				if spy == y and spx == x:
 					chars[0] = '['
 				elif spy == y and spx+1 == x:

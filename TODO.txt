@@ -3,6 +3,7 @@ TODO
 - split game state logic in State instances, with start and end callbacks
 - manage globally fall and combo states !!!
 - profile game and UI, make the game faster and lighter -> ok
+- handle players
 
 FIXME
 
