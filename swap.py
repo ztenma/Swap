@@ -38,7 +38,7 @@ class Player(object):
 		
 		self.score = 0
 		self.scoreMultiplier = 1
-		self.grid = Grid(15, 20, 4)
+		self.grid = Grid(12, 20, 4)
 		self.swapperPos = (0, 0)
 		self.stateMachine = StateMachine()
 

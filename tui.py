@@ -42,15 +42,15 @@ class TUI(object):
 
 		scoreTitle = urwid.AttrMap(urwid.Text('Score', align='center'), 'title')
 		scoreCont = urwid.Filler(scoreTitle, 'top', top=2)
-		scoreLabel = urwid.Text(str(self.game.players[1].score), align='center')
+		scoreLabel = urwid.Text('_%s | %s_' % (self.game.players[0].score, self.game.players[1].score), align='center')
 
 		multiplierTitle = urwid.AttrMap(urwid.Text('Multiplier', align='center'), 'title')
 		multiplierCont = urwid.Filler(multiplierTitle, 'top', top=2)
-		multiplierLabel = urwid.Text(str(self.game.players[1].scoreMultiplier), align='center')
+		multiplierLabel = urwid.Text('%s | %s' % (self.game.players[0].scoreMultiplier, self.game.players[1].scoreMultiplier), align='center')
 
 		stateTitle = urwid.AttrMap(urwid.Text('State', align='center'), 'title')
 		stateCont = urwid.Filler(stateTitle, 'top', top=2)
-		stateLabel = urwid.Text(self.game.players[1].stateMachine.vcrepr(), align='left')
+		stateLabel = urwid.Text('%s\n%s' % (self.game.players[0].stateMachine.vcrepr(), self.game.players[1].stateMachine.vcrepr()), align='left')
 
 		statsPile = urwid.Pile([scoreCont,
 			urwid.Filler(urwid.AttrMap(scoreLabel, 'stats'), 'top', top=1),
@@ -60,7 +60,7 @@ class TUI(object):
 			urwid.Filler(urwid.AttrMap(stateLabel, 'stats'), 'top', top=1)
 			])
 
-		columns = urwid.Columns([(32, leftCont), statsPile, (32, rightCont)])
+		columns = urwid.Columns([(12*2+2, leftCont), statsPile, (12*2+2, rightCont)])
 
 		frame = urwid.Frame(header=header, body=columns)
 
@@ -93,8 +93,8 @@ class TUI(object):
 	def updateUI(self):
 		self.leftGrid.set_text(self.buildMarkup(self.game.players[0]))
 		self.rightGrid.set_text(self.buildMarkup(self.game.players[1]))
-		self.scoreLabel.set_text(str(self.game.players[1].score))
-		self.multiplierLabel.set_text('x' + str(self.game.players[1].scoreMultiplier))
+		self.scoreLabel.set_text('%s | %s' % (self.game.players[0].score, self.game.players[1].score))
+		self.multiplierLabel.set_text('x%s | x%s' % (self.game.players[0].scoreMultiplier, self.game.players[1].scoreMultiplier))
 
 	def update(self, loop, userData):
 		
@@ -113,7 +113,7 @@ class TUI(object):
 
 	def updateDebugUI(self, loop, userData):
 		if not self.game.pause:
-			self.stateLabel.set_text(self.game.players[1].stateMachine.vcrepr())
+			self.stateLabel.set_text('%s\n%s' % (self.game.players[0].stateMachine.vcrepr(), self.game.players[1].stateMachine.vcrepr()))
 		self.mainLoop.set_alarm_in(.2, self.updateDebugUI)
 
 	def buildMarkup(self, player):
