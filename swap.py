@@ -23,11 +23,12 @@ from itertoolsExt import flatten
 
 from log import *
 from grid import Grid, Combo, Block
+from state import State, StateMachine
+
 
 SCORES = [2, 3, 5, 10, 20, 50, 100, 200, 400, 600, 800]
 scoreIt = lambda x: SCORES[x-3] if x <= 10 else 1000
 
-STATES_ABBREV = {'debug': 'D', 'swap': 's', 'AI_swap': 'S', 'fall': 'F', 'combo': 'C', 'block': 'B'}
 
 class Player(object):
 	
@@ -38,8 +39,10 @@ class Player(object):
 		
 		self.score = 0
 		self.scoreMultiplier = 1
-		self.grid = Grid(12, 20, 4)
 		self.swapperPos = (0, 0)
+		
+		self.grid = Grid(12, 20, 4)
+		
 		self.stateMachine = StateMachine()
 
 class Game(object):
@@ -262,92 +265,6 @@ with the difference set"""
 					comboGroup3.append(combo2)
 		DEBUG("morph combo group: %s", comboGroup3)
 		return comboGroup3
-
-class StateMachine(dict):
-	"""Represents a dynamic concurrent state machine.
-
-	It can hold mutiples states at the same time. States are timed.
-	update() update all states statuses."""
-
-	def __init__(self):
-		dict.__init__(self)
-
-	def transition(self, toStateName, duration=None, data=None, fromStateName=None):
-		"""Transition to another state. If specified, it replaces the state
-		named fromStateName."""
-		if fromStateName:
-			del self[fromStateName]
-		#TODO: if duration == 0: # directly call end callback
-		self[toStateName] = State(toStateName, duration, data)
-		#DEBUG("Transition\n%s", repr(self))
-
-	def delete(self, stateName):
-		"""Delete a state"""
-		del self[stateName]
-
-	def update(self, dt):
-		"""Update all the states in the machine"""
-
-		for state in self.values():
-			if state.elapsedTime != None and state.elapsedTime + dt >= state.duration:
-				state.status = "ending"
-			elif state.status == "starting" and state.elapsedTime != 0:
-				state.status = "ongoing"
-
-			if state.elapsedTime is not None:
-				state.elapsedTime += dt
-
-		#DEBUG("Update\n%s", repr(self))
-
-	def _shortenStatus(self, status):
-		return {'starting': '/', 'ongoing': '', 'ending': '\\'}[status]
-
-	def _shortenName(self, stateName):
-		try:
-			stateName = stateName.split('#')
-			return STATES_ABBREV[stateName[0]] #+ stateName[1] if len(stateName) > 1 else ''
-		except KeyError:
-			raise KeyError("state name not registered")
-
-	def isChanging(self, stateName):
-		return self[stateName].status == "ending"
-
-	def crepr(self, onlyChanging=False):
-		"""A compact representation"""
-		if not onlyChanging: return ' '.join("{}{}".format(name, self._shortenStatus(self[name].status)) for name in self)
-		return ' '.join("{}{}".format(name, self._shortenStatus(self[name].status)) for name in self if self.isChanging(name))
-
-	def crepr2(self, onlyChanging=False):
-		"""A compact representation"""
-		if not onlyChanging: return ' '.join(self)
-		return ' '.join(filter(self.isChanging, self))
-
-	def vcrepr(self, onlyChanging=False):
-		"""A very compact representation"""
-		if not onlyChanging: return ' '.join(map(self._shortenName, self))
-		return ' '.join(map(self._shortenName, filter(self.isChanging, self)))
-
-	def trepr(self):
-		"""A representation of progression of states"""
-		return '[' + ', '.join("{} {:.2f}/{:.2f}".format(name,
-			self[name].elapsedTime, self[name].duration) for name in self) + ']'
-
-class State(object): # TODO: add start and end callbacks
-	"""Represents a game state
-
-A state can have finite or infinite duration (None value).
-A status attribute describe whether the state is starting, ongoing or ending.
-If necessary, data can be stored for the purpose of state logic."""
-
-	def __init__(self, name=None, duration=None, data=None):
-		self.name = name
-		self.status = "starting"
-		self.duration = duration
-		self.elapsedTime = 0
-		self.data = data # Data conveyed by the state
-
-	def __repr__(self):
-		return "State({self.status},{self.elapsedTime:.2f}/{self.duration:.2f},{self.data})".format(self=self)
 
 def listFind(lst, val, key=(lambda x: x)):
 	for i,e in enumerate(lst):

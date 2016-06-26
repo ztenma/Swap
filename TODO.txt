@@ -7,4 +7,13 @@ TODO
 FIXME
 
 - algo morph?
+- multiplier?
 - combosAfterFall
+
+THOUGHTS
+
+- Sequence of events
+
+fall after combo, swap (IA or Human), block
+combo after fall, swap (IA or Human), block
+inputs: Human swap, direction, pause
