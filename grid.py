@@ -67,15 +67,19 @@ class Grid(object):
 		"""Generate a valid grid"""
 		for x in range(self.width):
 			for y in reversed(range(randrange(self.height) + 1, self.height)):
-				self._grid[x][y] = self.genBlock(x, y)
+				self._grid[x][y] = self.genDifferentBlock(x, y)
 
-	def genBlock(self, x:int, y:int):
+	def genDifferentBlock(self, x:int, y:int):
 		"""Generate a random block based on neighbour blocks"""
 		rand = randrange(1, self.nbSymbols)
 		while (y <= self.height - 3 and self[x][y+1] == self[x][y+2] == rand) \
 		or (x >= 2 and self[x-1][y] == self[x-2][y] == rand):
 			rand = randrange(1, self.nbSymbols)
 		return rand
+		
+	def spawnBlock(self):
+		"""Spawn a block at the top of the grid"""
+		self[randrange(0, self.width)][0] = randrange(0, self.nbSymbols)
 
 	def swap(self, x:int, y:int):
 		"""Swap two blocks horizontally"""

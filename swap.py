@@ -27,7 +27,7 @@ from grid import Grid, Combo, Block
 SCORES = [2, 3, 5, 10, 20, 50, 100, 200, 400, 600, 800]
 scoreIt = lambda x: SCORES[x-3] if x <= 10 else 1000
 
-STATES_ABBREV = {'debug': 'D', 'swap': 's', 'AI_swap': 'S', 'fall': 'F', 'combo': 'C'}
+STATES_ABBREV = {'debug': 'D', 'swap': 's', 'AI_swap': 'S', 'fall': 'F', 'combo': 'C', 'block': 'B'}
 
 class Player(object):
 	
@@ -57,8 +57,9 @@ class Game(object):
 		for player in self.players:
 			if player.type == 'AI':
 				player.stateMachine.transition("AI_swap", 2) # To enable AI
+			player.stateMachine.transition("block", 4)
 
-	def update(self): # TODO: handle players
+	def update(self):
 
 		currentTime = time()
 		dt = currentTime - self.lastTime
@@ -83,6 +84,12 @@ class Game(object):
 				elif player.stateMachine["AI_swap"].status == "ending":
 					self.swap(player)
 					player.stateMachine.transition("AI_swap", 1.5)
+					
+			elif stateName == "block":
+				if player.stateMachine["block"].status == "ending":
+					player.grid.spawnBlock()
+					self.checkAndFall(player)
+					player.stateMachine.transition("block", .5)
 
 			elif stateName.startswith("fall#"):
 				if player.stateMachine[stateName].status == "ending":
@@ -97,7 +104,7 @@ class Game(object):
 						else:
 							player.stateMachine.delete(stateName)
 							sumFalls = sum(1 for name in player.stateMachine if name.startswith("fall#"))
-							comboGroup = self.checkCombo(player, "fall", pos)
+							comboGroup = self.checkAndCombo(player, "fall", pos)
 							if sumFalls == 0 and not comboGroup:
 								player.scoreMultiplier = 1
 
@@ -111,9 +118,9 @@ class Game(object):
 
 					player.stateMachine.delete(stateName)
 					#DEBUG("After delete combo: %s", self.getComboGroups(player))
-					self.checkFall(player)
+					self.checkAndFall(player)
 
-	def checkFall(self, player, focusX=None):
+	def checkAndFall(self, player, focusX=None):
 		"""Check whether some blocks have to fall. Return lower holes.
 
 		Creates fall state for each hole found.
@@ -121,10 +128,9 @@ class Game(object):
 
 		lowerHoles = player.grid.lowerHoles(focusX)
 		#DEBUG("Lower holes: %s", lowerHoles)
-		if lowerHoles:
-			for pos in lowerHoles:
-				if "fall#" + str(pos[0]) not in player.stateMachine:
-					player.stateMachine.transition("fall#" + str(pos[0]), .2, pos)
+		for pos in lowerHoles:
+			if "fall#" + str(pos[0]) not in player.stateMachine:
+				player.stateMachine.transition("fall#" + str(pos[0]), .2, pos)
 		return lowerHoles
 
 	def getComboGroups(self, player):
@@ -136,7 +142,7 @@ class Game(object):
 				return i
 		raise RuntimeError("Too much combos")
 
-	def checkCombo(self, player, checkType, pos):
+	def checkAndCombo(self, player, checkType, pos):
 		"""Check whether there are combos. Return combo group.
 
 		Creates combo state."""
@@ -205,8 +211,8 @@ class Game(object):
 	def swap(self, player):
 		x, y = player.swapperPos
 		player.grid.swap(x, y)
-		self.checkFall(player, [x, x+1])
-		self.checkCombo(player, "swap", (x, y))
+		self.checkAndFall(player, [x, x+1])
+		self.checkAndCombo(player, "swap", (x, y))
 		
 	def moveSwapper(self, player, direction):
 		assert direction in ('up', 'right', 'down', 'left'), "direction must be one of up, right, down, left"
